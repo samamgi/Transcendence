@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.local
+
+# Builds
+dist/
+build/
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# Operating systems
+.DS_Store
+
+# Certificates and secrets
+*.key
+*.pem
+nginx/certificates/
+
+# Uploads
+uploads/
