@@ -1,0 +1,25 @@
+services:
+  database:
+    image: postgres:17-alpine
+    container_name: transcendence-database
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: transcendence
+      POSTGRES_PASSWORD: transcendence_password
+      POSTGRES_DB: transcendence
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U transcendence -d transcendence"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
