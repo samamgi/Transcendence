@@ -2,33 +2,76 @@ import type { Request, Response } from "express";
 import { userService } from "../services/user.service.js";
 
 export class UserController {
-	async getAllUsers(_request: Request, response: Response) {
-		try {
-			const users = await userService.getAllUsers();
+	async getMe(
+		request: Request,
+		response: Response,
+	) {
+		const user = await userService.getMe(
+			request.session.userId!,
+		);
 
-			response.status(200).json(users);
-		} catch (error) {
-			console.error("Unable to list users:", error);
-
-			response.status(500).json({
-				error: "Internal server error",
-			});
-		}
+		response.json({
+			user,
+		});
 	}
 
-	async createUser(request: Request, response: Response) {
-		try {
-			const user = await userService.createUser(request.body);
+	async getById(
+		request: Request,
+		response: Response,
+	) {
+		const user = await userService.getById(
+			Number(request.params.id),
+		);
 
-			response.status(201).json(user);
-		} catch (error) {
-			response.status(400).json({
-				error: error instanceof Error
-					? error.message
-					: "Invalid request",
-			});
-		}
+		response.json({
+			user,
+		});
 	}
+
+	async updateMe(
+		request: Request,
+		response: Response,
+	) {
+		const user = await userService.updateProfile(
+			request.session.userId!,
+			request.body,
+		);
+
+		response.json({
+			message: "Profile updated",
+			user,
+		});
+	}
+
+	async updateAvatar(
+		request: Request,
+		response: Response,
+	) {
+		const user = await userService.updateAvatar(
+			request.session.userId!,
+			request.file,
+		);
+
+		response.json({
+			message: "Avatar updated",
+			user,
+		});
+	}
+	async searchUsers(
+		request: Request,
+		response: Response,
+	) {
+		const users =
+			await userService.searchUsers(
+				request.session.userId!,
+				String(request.query.query ?? ""),
+			);
+
+		response.status(200).json({
+			users,
+		});
+	}
+
 }
 
 export const userController = new UserController();

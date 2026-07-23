@@ -1,69 +1,192 @@
-import bcrypt from "bcryptjs";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { HttpError } from "../lib/http-error.js";
 import { userRepository } from "../repositories/user.repository.js";
 
-type CreateUserInput = {
+type UpdateProfileInput = {
 	username?: unknown;
-	email?: unknown;
-	password?: unknown;
+	displayName?: unknown;
 };
 
 export class UserService {
-	async getAllUsers() {
-		return userRepository.findAll();
+	async getMe(userId: number) {
+		const user = await userRepository.findById(userId);
+
+		if (!user) {
+			throw new HttpError(404, "User not found");
+		}
+
+		return user;
 	}
 
-	async createUser(data: CreateUserInput) {
-		if (
-			typeof data.username !== "string"
-			|| typeof data.email !== "string"
-			|| typeof data.password !== "string"
-		) {
-			throw new Error("Username, email and password are required");
+	async getById(id: number) {
+		if (!Number.isInteger(id) || id <= 0) {
+			throw new HttpError(400, "Invalid user id");
 		}
 
-		const username = data.username.trim();
-		const email = data.email.trim().toLowerCase();
-		const password = data.password;
+		const user = await userRepository.findPublicById(id);
 
-		if (username.length < 3 || username.length > 20) {
-			throw new Error("Username must contain between 3 and 20 characters");
+		if (!user) {
+			throw new HttpError(404, "User not found");
 		}
 
-		if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
-			throw new Error(
-				"Username may only contain letters, numbers, underscores and hyphens",
+		return user;
+	}
+
+	async updateProfile(
+		userId: number,
+		data: UpdateProfileInput,
+	) {
+		const currentUser = await userRepository.findById(userId);
+
+		if (!currentUser) {
+			throw new HttpError(404, "User not found");
+		}
+
+		const updateData: {
+			username?: string;
+			displayName?: string | null;
+		} = {};
+
+		if (data.username !== undefined) {
+			if (typeof data.username !== "string") {
+				throw new HttpError(400, "Invalid username");
+			}
+
+			const username = data.username.trim();
+
+			if (username.length < 3 || username.length > 20) {
+				throw new HttpError(
+					400,
+					"Username must contain between 3 and 20 characters",
+				);
+			}
+
+			if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+				throw new HttpError(400, "Invalid username");
+			}
+
+			const existingUser =
+				await userRepository.findByUsername(username);
+
+			if (
+				existingUser &&
+				existingUser.id !== userId
+			) {
+				throw new HttpError(
+					409,
+					"Username already exists",
+				);
+			}
+
+			updateData.username = username;
+		}
+
+		if (data.displayName !== undefined) {
+			if (
+				data.displayName !== null &&
+				typeof data.displayName !== "string"
+			) {
+				throw new HttpError(
+					400,
+					"Invalid display name",
+				);
+			}
+
+			if (data.displayName === null) {
+				updateData.displayName = null;
+			} else {
+				const displayName = data.displayName.trim();
+
+				if (displayName.length > 50) {
+					throw new HttpError(
+						400,
+						"Display name must contain at most 50 characters",
+					);
+				}
+
+				updateData.displayName =
+					displayName.length === 0
+						? null
+						: displayName;
+			}
+		}
+
+		if (Object.keys(updateData).length === 0) {
+			throw new HttpError(
+				400,
+				"No profile fields to update",
 			);
 		}
 
-		if (!email.includes("@") || email.length > 254) {
-			throw new Error("Invalid email address");
-		}
-
-		if (password.length < 8 || password.length > 72) {
-			throw new Error("Password must contain between 8 and 72 characters");
-		}
-
-		const existingUsername =
-			await userRepository.findByUsername(username);
-
-		if (existingUsername) {
-			throw new Error("Username already exists");
-		}
-
-		const existingEmail = await userRepository.findByEmail(email);
-
-		if (existingEmail) {
-			throw new Error("Email already exists");
-		}
-
-		const passwordHash = await bcrypt.hash(password, 12);
-
-		return userRepository.create({
-			username,
-			email,
-			passwordHash,
-		});
+		return userRepository.updateProfile(
+			userId,
+			updateData,
+		);
 	}
+
+	async updateAvatar(
+		userId: number,
+		file?: Express.Multer.File,
+	) {
+		const user = await userRepository.findById(userId);
+
+		if (!user) {
+			throw new HttpError(404, "User not found");
+		}
+
+		if (!file) {
+			throw new HttpError(400, "Avatar file is required");
+		}
+
+		const avatarUrl = `/uploads/avatars/${path.basename(file.filename)}`;
+
+		try {
+			const updatedUser =
+				await userRepository.updateAvatar(
+					userId,
+					avatarUrl,
+				);
+
+			if (user.avatarUrl) {
+				const oldFile = path.resolve(
+					"." + user.avatarUrl,
+				);
+
+				await fs.rm(oldFile, {
+					force: true,
+				});
+			}
+
+			return updatedUser;
+		} catch (error) {
+			await fs.rm(file.path, {
+				force: true,
+			});
+
+			throw error;
+		}
+	}
+
+	async searchUsers(
+		userId: number,
+		query: string,
+	) {
+		const search = query.trim();
+
+		if (search.length < 2) {
+			throw new HttpError(
+				400,
+				"Search query must contain at least 2 characters",
+			);
+		}
+
+		return userRepository.searchUsers(
+			userId,
+			search,
+		);
+	}
+
 }
 
 export const userService = new UserService();
