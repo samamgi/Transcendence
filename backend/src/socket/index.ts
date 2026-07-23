@@ -16,6 +16,19 @@ type JoinConversationResponse = {
 	error?: string;
 };
 
+type SendMessagePayload = {
+	conversationId: number;
+	content: string;
+};
+
+type SendMessageResponse = {
+	success: boolean;
+	message?: Awaited<
+		ReturnType<typeof conversationService.sendMessage>
+	>;
+	error?: string;
+};
+
 let io: Server | undefined;
 
 export function initializeSocket(
@@ -125,6 +138,72 @@ export function initializeSocket(
 							error instanceof Error
 								? error.message
 								: "Unable to join conversation",
+					});
+				}
+			},
+		);
+
+
+		socket.on(
+			"leaveConversation",
+			async (
+				conversationId: number,
+				callback?: (
+					response: JoinConversationResponse,
+				) => void,
+			) => {
+				try {
+					await conversationService.ensureParticipant(
+						conversationId,
+						userId,
+					);
+
+					await socket.leave(
+						`conversation:${conversationId}`,
+					);
+
+					callback?.({
+						success: true,
+					});
+				} catch (error) {
+					callback?.({
+						success: false,
+						error:
+							error instanceof Error
+								? error.message
+								: "Unable to leave conversation",
+					});
+				}
+			},
+		);
+
+		socket.on(
+			"sendMessage",
+			async (
+				payload: SendMessagePayload,
+				callback?: (
+					response: SendMessageResponse,
+				) => void,
+			) => {
+				try {
+					const message =
+						await conversationService.sendMessage(
+							payload?.conversationId,
+							userId,
+							payload?.content,
+						);
+
+					callback?.({
+						success: true,
+						message,
+					});
+				} catch (error) {
+					callback?.({
+						success: false,
+						error:
+							error instanceof Error
+								? error.message
+								: "Unable to send message",
 					});
 				}
 			},

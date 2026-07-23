@@ -11,8 +11,24 @@ const TEST_USER = {
 	password: "AliceTest123!",
 };
 
+type SocketMessage = {
+	id: number;
+	conversationId: number;
+	senderId: number;
+	content: string;
+	createdAt: string;
+	updatedAt: string;
+	sender: {
+		id: number;
+		username: string;
+		displayName: string | null;
+		avatarUrl: string | null;
+	};
+};
+
 type SocketResponse = {
 	success: boolean;
+	message?: SocketMessage;
 	error?: string;
 };
 
@@ -208,6 +224,38 @@ function emitWithAck(
 	});
 }
 
+function emitSendMessage(
+	socket: Socket,
+	conversationId: number,
+	content: string,
+): Promise<SocketResponse> {
+	return new Promise((resolve, reject) => {
+		socket.timeout(5000).emit(
+			"sendMessage",
+			{
+				conversationId,
+				content,
+			},
+			(
+				error: Error | null,
+				response: SocketResponse,
+			) => {
+				if (error) {
+					reject(
+						new Error(
+							"Aucune réponse pour sendMessage " +
+							`avec la conversation ${conversationId}`,
+						),
+					);
+					return;
+				}
+
+				resolve(response);
+			},
+		);
+	});
+}
+
 async function connectSocket(cookie: string): Promise<Socket> {
 	return new Promise((resolve, reject) => {
 		const socket = io(API_URL, {
@@ -272,6 +320,67 @@ async function main(): Promise<void> {
 			);
 		}
 
+		const sentContent = "  Bonjour depuis Socket.IO  ";
+
+		const sendResponse = await emitSendMessage(
+			socket,
+			conversationId,
+			sentContent,
+		);
+
+		console.log(
+			`Message envoyé dans la conversation ${conversationId} :`,
+			sendResponse,
+		);
+
+		if (!sendResponse.success || !sendResponse.message) {
+			throw new Error(
+				"L'envoi du message autorisé a échoué : " +
+					(sendResponse.error ?? "message absent"),
+			);
+		}
+
+		if (
+			sendResponse.message.conversationId !== conversationId
+		) {
+			throw new Error(
+				"Le message a été associé à la mauvaise conversation.",
+			);
+		}
+
+		if (sendResponse.message.senderId !== userId) {
+			throw new Error(
+				"Le message a été associé au mauvais expéditeur.",
+			);
+		}
+
+		if (
+			sendResponse.message.content !==
+			"Bonjour depuis Socket.IO"
+		) {
+			throw new Error(
+				"Le contenu du message n'a pas été correctement nettoyé.",
+			);
+		}
+
+		const leaveResponse = await emitWithAck(
+			socket,
+			"leaveConversation",
+			conversationId,
+		);
+
+		console.log(
+			`Quitter la conversation ${conversationId} :`,
+			leaveResponse,
+		);
+
+		if (!leaveResponse.success) {
+			throw new Error(
+				"Impossible de quitter la conversation autorisée : " +
+					(leaveResponse.error ?? "erreur inconnue"),
+			);
+		}
+
 		const forbiddenConversationId = 2_147_483_647;
 
 		const forbiddenResponse = await emitWithAck(
@@ -288,6 +397,23 @@ async function main(): Promise<void> {
 		if (forbiddenResponse.success) {
 			throw new Error(
 				"Une conversation non autorisée a été acceptée.",
+			);
+		}
+
+		const forbiddenSendResponse = await emitSendMessage(
+			socket,
+			forbiddenConversationId,
+			"Message interdit",
+		);
+
+		console.log(
+			`Message interdit dans ${forbiddenConversationId} :`,
+			forbiddenSendResponse,
+		);
+
+		if (forbiddenSendResponse.success) {
+			throw new Error(
+				"Un message a été envoyé dans une conversation non autorisée.",
 			);
 		}
 
