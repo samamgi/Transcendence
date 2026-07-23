@@ -29,6 +29,20 @@ type SendMessageResponse = {
 	error?: string;
 };
 
+type GetMessagesPayload = {
+	conversationId: number;
+	limit?: number;
+	before?: number;
+};
+
+type GetMessagesResponse = {
+	success: boolean;
+	messages?: Awaited<
+		ReturnType<typeof conversationService.getMessages>
+	>;
+	error?: string;
+};
+
 type TypingPayload = {
 	conversationId: number;
 };
@@ -219,6 +233,39 @@ export function initializeSocket(
 							error instanceof Error
 								? error.message
 								: "Unable to send message",
+					});
+				}
+			},
+		);
+
+		socket.on(
+			"getMessages",
+			async (
+				payload: GetMessagesPayload,
+				callback?: (
+					response: GetMessagesResponse,
+				) => void,
+			) => {
+				try {
+					const messages =
+						await conversationService.getMessages(
+							payload?.conversationId,
+							userId,
+							payload?.limit,
+							payload?.before,
+						);
+
+					callback?.({
+						success: true,
+						messages,
+					});
+				} catch (error) {
+					callback?.({
+						success: false,
+						error:
+							error instanceof Error
+								? error.message
+								: "Unable to get messages",
 					});
 				}
 			},
