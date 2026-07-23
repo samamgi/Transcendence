@@ -193,6 +193,12 @@ export function initializeSocket(
 							payload?.content,
 						);
 
+					socket.nsp
+						.to(
+							`conversation:${message.conversationId}`,
+						)
+						.emit("newMessage", message);
+
 					callback?.({
 						success: true,
 						message,

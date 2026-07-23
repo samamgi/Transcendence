@@ -256,6 +256,28 @@ function emitSendMessage(
 	});
 }
 
+function waitForNewMessage(
+	socket: Socket,
+): Promise<SocketMessage> {
+	return new Promise((resolve, reject) => {
+		const timeout = setTimeout(() => {
+			socket.off("newMessage", onMessage);
+			reject(
+				new Error(
+					"Aucun événement newMessage reçu dans les 5 secondes.",
+				),
+			);
+		}, 5000);
+
+		function onMessage(message: SocketMessage): void {
+			clearTimeout(timeout);
+			resolve(message);
+		}
+
+		socket.once("newMessage", onMessage);
+	});
+}
+
 async function connectSocket(cookie: string): Promise<Socket> {
 	return new Promise((resolve, reject) => {
 		const socket = io(API_URL, {
@@ -280,6 +302,7 @@ async function connectSocket(cookie: string): Promise<Socket> {
 async function main(): Promise<void> {
 	let conversationId: number | null = null;
 	let socket: Socket | null = null;
+	let receiverSocket: Socket | null = null;
 
 	try {
 		await ensureTestUser();
@@ -319,6 +342,29 @@ async function main(): Promise<void> {
 					(allowedResponse.error ?? "erreur inconnue"),
 			);
 		}
+
+		receiverSocket = await connectSocket(cookie);
+
+		console.log(
+			"Second socket connecté :",
+			receiverSocket.id,
+		);
+
+		const receiverJoinResponse = await emitWithAck(
+			receiverSocket,
+			"joinConversation",
+			conversationId,
+		);
+
+		if (!receiverJoinResponse.success) {
+			throw new Error(
+				"Le second socket n'a pas pu rejoindre la conversation : " +
+					(receiverJoinResponse.error ?? "erreur inconnue"),
+			);
+		}
+
+		const receivedMessagePromise =
+			waitForNewMessage(receiverSocket);
 
 		const sentContent = "  Bonjour depuis Socket.IO  ";
 
@@ -360,6 +406,26 @@ async function main(): Promise<void> {
 		) {
 			throw new Error(
 				"Le contenu du message n'a pas été correctement nettoyé.",
+			);
+		}
+
+		const receivedMessage =
+			await receivedMessagePromise;
+
+		console.log(
+			"Événement newMessage reçu par le second socket :",
+			receivedMessage,
+		);
+
+		if (
+			receivedMessage.id !== sendResponse.message.id ||
+			receivedMessage.conversationId !== conversationId ||
+			receivedMessage.senderId !== userId ||
+			receivedMessage.content !==
+				"Bonjour depuis Socket.IO"
+		) {
+			throw new Error(
+				"L'événement newMessage ne correspond pas au message créé.",
 			);
 		}
 
@@ -419,6 +485,10 @@ async function main(): Promise<void> {
 
 		console.log("Test Socket.IO réussi.");
 	} finally {
+		if (receiverSocket) {
+			receiverSocket.disconnect();
+		}
+
 		if (socket) {
 			socket.disconnect();
 		}
