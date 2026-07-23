@@ -32,6 +32,12 @@ type SocketResponse = {
 	error?: string;
 };
 
+type GetMessagesResponse = {
+	success: boolean;
+	messages?: SocketMessage[];
+	error?: string;
+};
+
 type TypingEvent = {
 	conversationId: number;
 	userId: number;
@@ -314,6 +320,38 @@ function emitSendMessage(
 	});
 }
 
+
+function emitGetMessages(
+	socket: Socket,
+	conversationId: number,
+	limit = 50,
+	before?: number,
+): Promise<GetMessagesResponse> {
+	return new Promise((resolve, reject) => {
+		socket.timeout(5000).emit(
+			"getMessages",
+			{
+				conversationId,
+				limit,
+				before,
+			},
+			(
+				error: Error | null,
+				response: GetMessagesResponse,
+			) => {
+				if (error) {
+					reject(
+						new Error("Aucune réponse pour getMessages."),
+					);
+					return;
+				}
+
+				resolve(response);
+			},
+		);
+	});
+}
+
 function waitForNewMessage(
 	socket: Socket,
 ): Promise<SocketMessage> {
@@ -484,6 +522,37 @@ async function main(): Promise<void> {
 		) {
 			throw new Error(
 				"L'événement newMessage ne correspond pas au message créé.",
+			);
+		}
+
+		const historyResponse = await emitGetMessages(
+			socket,
+			conversationId,
+		);
+
+		console.log(
+			"Historique des messages :",
+			historyResponse,
+		);
+
+		if (
+			!historyResponse.success ||
+			!historyResponse.messages
+		) {
+			throw new Error(
+				"Impossible de récupérer l'historique.",
+			);
+		}
+
+		const foundMessage =
+			historyResponse.messages.find(
+				(message) =>
+					message.id === sendResponse.message!.id,
+			);
+
+		if (!foundMessage) {
+			throw new Error(
+				"Le message envoyé est absent de l'historique.",
 			);
 		}
 
