@@ -9,7 +9,7 @@ COMPOSE := podman-compose
 CONTAINER_ENGINE := podman
 DATABASE_CONTAINER := transcendence-database
 
-.PHONY: all \
+.PHONY: all \ kill-backend
 	setup install \
 	dev check \
 	db-up db-down db-restart db-status db-logs db-wait \
@@ -142,7 +142,11 @@ check: install
 # Nettoyage
 # ─────────────────────────────────────────────────────────────
 
-clean:
+kill-backend:
+	@echo "Arrêt du backend local..."
+	@fuser -k 3000/tcp 2>/dev/null || true
+
+clean: kill-backend
 	@echo "Arrêt des conteneurs..."
 	@cd "$(ROOT_DIR)" && $(COMPOSE) down
 	@echo "Suppression des fichiers compilés..."
@@ -152,4 +156,4 @@ fclean: clean
 	@echo "Suppression des dépendances du backend..."
 	@rm -rf "$(BACKEND_DIR)/node_modules"
 
-re: fclean setup
+re: fclean setup dev

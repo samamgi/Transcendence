@@ -32,6 +32,64 @@ type SocketResponse = {
 	error?: string;
 };
 
+type TypingEvent = {
+	conversationId: number;
+	userId: number;
+};
+
+function waitForTypingEvent(
+	socket: Socket,
+	event: "typing:start" | "typing:stop",
+): Promise<TypingEvent> {
+	return new Promise((resolve, reject) => {
+		const onTyping = (payload: TypingEvent): void => {
+			clearTimeout(timeout);
+			resolve(payload);
+		};
+
+		const timeout = setTimeout(() => {
+			socket.off(event, onTyping);
+			reject(
+				new Error(
+					`Aucun événement ${event} reçu dans les 5 secondes.`,
+				),
+			);
+		}, 5000);
+
+		socket.once(event, onTyping);
+	});
+}
+
+function emitTypingEvent(
+	socket: Socket,
+	event: "typing:start" | "typing:stop",
+	conversationId: number,
+): Promise<SocketResponse> {
+	return new Promise((resolve, reject) => {
+		socket.timeout(5000).emit(
+			event,
+			{
+				conversationId,
+			},
+			(
+				error: Error | null,
+				response: SocketResponse,
+			) => {
+				if (error) {
+					reject(
+						new Error(
+							`Aucune réponse pour ${event}.`,
+						),
+					);
+					return;
+				}
+
+				resolve(response);
+			},
+		);
+	});
+}
+
 function runSql(sql: string): string {
 	return execFileSync(
 		"podman",
@@ -429,6 +487,94 @@ async function main(): Promise<void> {
 			);
 		}
 
+		const typingStartPromise =
+			waitForTypingEvent(
+				receiverSocket,
+				"typing:start",
+			);
+
+		const typingStartResponse =
+			await emitTypingEvent(
+				socket,
+				"typing:start",
+				conversationId,
+			);
+
+		console.log(
+			"Réponse typing:start :",
+			typingStartResponse,
+		);
+
+		if (!typingStartResponse.success) {
+			throw new Error(
+				"typing:start a été refusé : " +
+					(typingStartResponse.error ??
+						"erreur inconnue"),
+			);
+		}
+
+		const typingStartEvent =
+			await typingStartPromise;
+
+		console.log(
+			"Événement typing:start reçu :",
+			typingStartEvent,
+		);
+
+		if (
+			typingStartEvent.conversationId !==
+				conversationId ||
+			typingStartEvent.userId !== userId
+		) {
+			throw new Error(
+				"Le contenu de typing:start est invalide.",
+			);
+		}
+
+		const typingStopPromise =
+			waitForTypingEvent(
+				receiverSocket,
+				"typing:stop",
+			);
+
+		const typingStopResponse =
+			await emitTypingEvent(
+				socket,
+				"typing:stop",
+				conversationId,
+			);
+
+		console.log(
+			"Réponse typing:stop :",
+			typingStopResponse,
+		);
+
+		if (!typingStopResponse.success) {
+			throw new Error(
+				"typing:stop a été refusé : " +
+					(typingStopResponse.error ??
+						"erreur inconnue"),
+			);
+		}
+
+		const typingStopEvent =
+			await typingStopPromise;
+
+		console.log(
+			"Événement typing:stop reçu :",
+			typingStopEvent,
+		);
+
+		if (
+			typingStopEvent.conversationId !==
+				conversationId ||
+			typingStopEvent.userId !== userId
+		) {
+			throw new Error(
+				"Le contenu de typing:stop est invalide.",
+			);
+		}
+
 		const leaveResponse = await emitWithAck(
 			socket,
 			"leaveConversation",
@@ -463,6 +609,24 @@ async function main(): Promise<void> {
 		if (forbiddenResponse.success) {
 			throw new Error(
 				"Une conversation non autorisée a été acceptée.",
+			);
+		}
+
+		const forbiddenTypingResponse =
+			await emitTypingEvent(
+				socket,
+				"typing:start",
+				forbiddenConversationId,
+			);
+
+		console.log(
+			`Typing interdit dans ${forbiddenConversationId} :`,
+			forbiddenTypingResponse,
+		);
+
+		if (forbiddenTypingResponse.success) {
+			throw new Error(
+				"typing:start a été accepté dans une conversation non autorisée.",
 			);
 		}
 

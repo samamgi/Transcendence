@@ -29,6 +29,15 @@ type SendMessageResponse = {
 	error?: string;
 };
 
+type TypingPayload = {
+	conversationId: number;
+};
+
+type TypingEvent = {
+	conversationId: number;
+	userId: number;
+};
+
 let io: Server | undefined;
 
 export function initializeSocket(
@@ -212,6 +221,79 @@ export function initializeSocket(
 								: "Unable to send message",
 					});
 				}
+			},
+		);
+
+		const handleTypingEvent = async (
+			event: "typing:start" | "typing:stop",
+			payload: TypingPayload,
+			callback?: (
+				response: JoinConversationResponse,
+			) => void,
+		): Promise<void> => {
+			try {
+				const conversationId =
+					payload?.conversationId;
+
+				await conversationService.ensureParticipant(
+					conversationId,
+					userId,
+				);
+
+				const typingEvent: TypingEvent = {
+					conversationId,
+					userId,
+				};
+
+				socket
+					.to(
+						`conversation:${conversationId}`,
+					)
+					.emit(event, typingEvent);
+
+				callback?.({
+					success: true,
+				});
+			} catch (error) {
+				callback?.({
+					success: false,
+					error:
+						error instanceof Error
+							? error.message
+							: `Unable to emit ${event}`,
+				});
+			}
+		};
+
+		socket.on(
+			"typing:start",
+			(
+				payload: TypingPayload,
+				callback?: (
+					response: JoinConversationResponse,
+				) => void,
+			) => {
+				void handleTypingEvent(
+					"typing:start",
+					payload,
+					callback,
+				);
+			},
+		);
+
+		socket.on(
+			"typing:stop",
+			(
+				payload: TypingPayload,
+				callback?: (
+					response: JoinConversationResponse,
+				) => void,
+			) => {
+				void handleTypingEvent(
+					"typing:stop",
+					payload,
+					callback,
+				);
 			},
 		);
 
