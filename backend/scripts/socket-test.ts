@@ -49,6 +49,17 @@ type TypingEvent = {
 	userId: number;
 };
 
+type MessageReadEvent = {
+	conversationId: number;
+	userId: number;
+	messageId: number;
+};
+
+type MarkConversationReadResponse = {
+	success: boolean;
+	error?: string;
+};
+
 function waitForTypingEvent(
 	socket: Socket,
 	event: "typing:start" | "typing:stop",
@@ -372,6 +383,60 @@ function emitGetMessages(
 	});
 }
 
+
+function emitConversationRead(
+	socket: Socket,
+	conversationId: number,
+	messageId: number,
+): Promise<MarkConversationReadResponse> {
+	return new Promise((resolve, reject) => {
+		socket.timeout(5000).emit(
+			"conversation:read",
+			{
+				conversationId,
+				messageId,
+			},
+			(
+				error: Error | null,
+				response: MarkConversationReadResponse,
+			) => {
+				if (error) {
+					reject(
+						new Error(
+							"Aucune réponse pour conversation:read.",
+						),
+					);
+					return;
+				}
+
+				resolve(response);
+			},
+		);
+	});
+}
+
+function waitForMessageRead(
+	socket: Socket,
+): Promise<MessageReadEvent> {
+	return new Promise((resolve, reject) => {
+		const timeout = setTimeout(() => {
+			socket.off("messageRead", onRead);
+			reject(
+				new Error(
+					"Aucun événement messageRead reçu dans les 5 secondes.",
+				),
+			);
+		}, 5000);
+
+		function onRead(payload: MessageReadEvent): void {
+			clearTimeout(timeout);
+			resolve(payload);
+		}
+
+		socket.once("messageRead", onRead);
+	});
+}
+
 function waitForNewMessage(
 	socket: Socket,
 ): Promise<SocketMessage> {
@@ -588,7 +653,9 @@ async function main(): Promise<void> {
 			);
 		}
 
-		receiverSocket = await connectSocket(cookie);
+		receiverSocket = await connectSocket(
+			presenceCookie,
+		);
 
 		console.log(
 			"Second socket connecté :",
@@ -702,6 +769,50 @@ async function main(): Promise<void> {
 		if (!foundMessage) {
 			throw new Error(
 				"Le message envoyé est absent de l'historique.",
+			);
+		}
+
+		const messageReadPromise =
+			waitForMessageRead(socket);
+
+		const readResponse =
+			await emitConversationRead(
+				receiverSocket,
+				conversationId,
+				sendResponse.message.id,
+			);
+
+		console.log(
+			"Réponse conversation:read :",
+			readResponse,
+		);
+
+		if (!readResponse.success) {
+			throw new Error(
+				"conversation:read a été refusé : " +
+					(readResponse.error ??
+						"erreur inconnue"),
+			);
+		}
+
+		const messageReadEvent =
+			await messageReadPromise;
+
+		console.log(
+			"Événement messageRead reçu :",
+			messageReadEvent,
+		);
+
+		if (
+			messageReadEvent.conversationId !==
+				conversationId ||
+			messageReadEvent.userId !==
+				presenceUserId ||
+			messageReadEvent.messageId !==
+				sendResponse.message.id
+		) {
+			throw new Error(
+				"Le contenu de l'événement messageRead est invalide.",
 			);
 		}
 

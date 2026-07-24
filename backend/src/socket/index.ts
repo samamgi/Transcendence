@@ -47,6 +47,22 @@ type TypingPayload = {
 	conversationId: number;
 };
 
+type MarkConversationReadPayload = {
+	conversationId: number;
+	messageId: number;
+};
+
+type MarkConversationReadResponse = {
+	success: boolean;
+	error?: string;
+};
+
+type MessageReadEvent = {
+	conversationId: number;
+	userId: number;
+	messageId: number;
+};
+
 type TypingEvent = {
 	conversationId: number;
 	userId: number;
@@ -284,6 +300,52 @@ export function initializeSocket(
 							error instanceof Error
 								? error.message
 								: "Unable to get messages",
+					});
+				}
+			},
+		);
+
+
+		socket.on(
+			"conversation:read",
+			async (
+				payload: MarkConversationReadPayload,
+				callback?: (
+					response: MarkConversationReadResponse,
+				) => void,
+			) => {
+				try {
+					await conversationService.markConversationRead(
+						payload?.conversationId,
+						userId,
+						payload?.messageId,
+					);
+
+					const messageReadEvent: MessageReadEvent = {
+						conversationId: payload.conversationId,
+						userId,
+						messageId: payload.messageId,
+					};
+
+					socket
+						.to(
+							`conversation:${payload.conversationId}`,
+						)
+						.emit(
+							"messageRead",
+							messageReadEvent,
+						);
+
+					callback?.({
+						success: true,
+					});
+				} catch (error) {
+					callback?.({
+						success: false,
+						error:
+							error instanceof Error
+								? error.message
+								: "Unable to mark conversation as read",
 					});
 				}
 			},
