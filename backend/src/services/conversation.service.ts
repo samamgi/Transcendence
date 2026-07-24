@@ -75,6 +75,7 @@ export class ConversationService {
 				updatedAt: conversation.updatedAt,
 				otherUser: otherParticipant?.user ?? null,
 				lastMessage: conversation.messages[0] ?? null,
+				unreadCount: conversation.unreadCount,
 			};
 		});
 	}

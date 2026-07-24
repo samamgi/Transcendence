@@ -51,38 +51,96 @@ export class ConversationRepository {
 	}
 
 	async findUserConversations(userId: number) {
-		return prisma.conversation.findMany({
-			where: {
-				participants: {
-					some: {
-						userId,
-					},
-				},
-			},
-			include: {
-				participants: {
-					include: {
-						user: {
-							select: {
-								id: true,
-								username: true,
-								displayName: true,
-								avatarUrl: true,
-							},
+		const conversations =
+			await prisma.conversation.findMany({
+				where: {
+					participants: {
+						some: {
+							userId,
 						},
 					},
 				},
-				messages: {
-					orderBy: {
-						createdAt: "desc",
+				include: {
+					participants: {
+						include: {
+							user: {
+								select: {
+									id: true,
+									username: true,
+									displayName: true,
+									avatarUrl: true,
+								},
+							},
+						},
 					},
-					take: 1,
+					messages: {
+						orderBy: {
+							createdAt: "desc",
+						},
+						take: 1,
+					},
 				},
-			},
-			orderBy: {
-				updatedAt: "desc",
-			},
-		});
+				orderBy: {
+					updatedAt: "desc",
+				},
+			});
+
+		if (conversations.length === 0) {
+			return [];
+		}
+
+		const unreadMessageCounts =
+			await prisma.message.groupBy({
+				by: ["conversationId"],
+				where: {
+					OR: conversations.map(
+						(conversation) => {
+							const currentParticipant =
+								conversation.participants.find(
+									(participant) =>
+										participant.userId === userId,
+								);
+
+							const lastReadMessageId =
+								currentParticipant?.lastReadMessageId;
+
+							return {
+								conversationId: conversation.id,
+								senderId: {
+									not: userId,
+								},
+								...(lastReadMessageId !== null &&
+								lastReadMessageId !== undefined
+									? {
+										id: {
+											gt: lastReadMessageId,
+										},
+									}
+									: {}),
+							};
+						},
+					),
+				},
+				_count: {
+					_all: true,
+				},
+			});
+
+		const unreadCountByConversation =
+			new Map(
+				unreadMessageCounts.map((result) => [
+					result.conversationId,
+					result._count._all,
+				]),
+			);
+
+		return conversations.map((conversation) => ({
+			...conversation,
+			unreadCount:
+				unreadCountByConversation.get(
+					conversation.id,
+				) ?? 0,
+		}));
 	}
 
 
