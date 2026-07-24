@@ -54,6 +54,8 @@ type TypingEvent = {
 
 let io: Server | undefined;
 
+const connectedUsers = new Map<number, number>();
+
 export function initializeSocket(
 	server: HttpServer,
 ): Server {
@@ -134,6 +136,20 @@ export function initializeSocket(
 		);
 
 		void socket.join(`user:${userId}`);
+
+		const currentConnectionCount =
+			connectedUsers.get(userId) ?? 0;
+
+		connectedUsers.set(
+			userId,
+			currentConnectionCount + 1,
+		);
+
+		if (currentConnectionCount === 0) {
+			socket.broadcast.emit("userOnline", {
+				userId,
+			});
+		}
 
 		socket.on(
 			"joinConversation",
@@ -350,6 +366,25 @@ export function initializeSocket(
 			console.log(
 				`User ${userId} disconnected (${socket.id})`,
 			);
+
+			const currentConnectionCount =
+				connectedUsers.get(userId) ?? 0;
+
+			const nextConnectionCount =
+				Math.max(0, currentConnectionCount - 1);
+
+			if (nextConnectionCount === 0) {
+				connectedUsers.delete(userId);
+
+				socket.broadcast.emit("userOffline", {
+					userId,
+				});
+			} else {
+				connectedUsers.set(
+					userId,
+					nextConnectionCount,
+				);
+			}
 		});
 	});
 

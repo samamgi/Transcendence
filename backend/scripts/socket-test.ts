@@ -11,6 +11,12 @@ const TEST_USER = {
 	password: "AliceTest123!",
 };
 
+const PRESENCE_TEST_USER = {
+	username: "bob_socket_presence",
+	email: "bob.socket.presence@example.com",
+	password: "BobTest123!",
+};
+
 type SocketMessage = {
 	id: number;
 	conversationId: number;
@@ -114,17 +120,21 @@ function runSql(sql: string): string {
 	).trim();
 }
 
-async function ensureTestUser(): Promise<void> {
+async function ensureTestUser(
+	user = TEST_USER,
+): Promise<void> {
 	const response = await fetch(`${API_URL}/api/auth/register`, {
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
 		},
-		body: JSON.stringify(TEST_USER),
+		body: JSON.stringify(user),
 	});
 
 	if (response.ok) {
-		console.log("Utilisateur de test créé.");
+		console.log(
+			`Utilisateur de test ${user.username} créé.`,
+		);
 		return;
 	}
 
@@ -133,7 +143,9 @@ async function ensureTestUser(): Promise<void> {
 	 * Le login qui suit permettra de vérifier qu'il est utilisable.
 	 */
 	if (response.status === 400 || response.status === 409) {
-		console.log("Utilisateur de test déjà présent.");
+		console.log(
+			`Utilisateur de test ${user.username} déjà présent.`,
+		);
 		return;
 	}
 
@@ -141,19 +153,21 @@ async function ensureTestUser(): Promise<void> {
 
 	throw new Error(
 		`Impossible de préparer l'utilisateur de test ` +
-			`(${response.status}) : ${body}`,
+			`${user.username} (${response.status}) : ${body}`,
 	);
 }
 
-async function login(): Promise<string> {
+async function login(
+	user = TEST_USER,
+): Promise<string> {
 	const response = await fetch(`${API_URL}/api/auth/login`, {
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
 		},
 		body: JSON.stringify({
-			email: TEST_USER.email,
-			password: TEST_USER.password,
+			email: user.email,
+			password: user.password,
 		}),
 	});
 
@@ -374,6 +388,58 @@ function waitForNewMessage(
 	});
 }
 
+type PresenceEvent = {
+	userId: number;
+};
+
+function waitForPresenceEvent(
+	socket: Socket,
+	event: "userOnline" | "userOffline",
+): Promise<PresenceEvent> {
+	return new Promise((resolve, reject) => {
+		const onPresence = (payload: PresenceEvent): void => {
+			clearTimeout(timeout);
+			resolve(payload);
+		};
+
+		const timeout = setTimeout(() => {
+			socket.off(event, onPresence);
+			reject(
+				new Error(
+					`Aucun événement ${event} reçu dans les 5 secondes.`,
+				),
+			);
+		}, 5000);
+
+		socket.once(event, onPresence);
+	});
+}
+
+function expectNoPresenceEvent(
+	socket: Socket,
+	event: "userOnline" | "userOffline",
+	duration = 500,
+): Promise<void> {
+	return new Promise((resolve, reject) => {
+		const onPresence = (payload: PresenceEvent): void => {
+			clearTimeout(timeout);
+			reject(
+				new Error(
+					`${event} reçu de manière inattendue pour ` +
+						`l'utilisateur ${payload.userId}.`,
+				),
+			);
+		};
+
+		const timeout = setTimeout(() => {
+			socket.off(event, onPresence);
+			resolve();
+		}, duration);
+
+		socket.once(event, onPresence);
+	});
+}
+
 async function connectSocket(cookie: string): Promise<Socket> {
 	return new Promise((resolve, reject) => {
 		const socket = io(API_URL, {
@@ -399,12 +465,21 @@ async function main(): Promise<void> {
 	let conversationId: number | null = null;
 	let socket: Socket | null = null;
 	let receiverSocket: Socket | null = null;
+	let presenceSocket1: Socket | null = null;
+	let presenceSocket2: Socket | null = null;
 
 	try {
 		await ensureTestUser();
+		await ensureTestUser(PRESENCE_TEST_USER);
 
 		const cookie = await login();
 		const userId = await getAuthenticatedUserId(cookie);
+
+		const presenceCookie =
+			await login(PRESENCE_TEST_USER);
+
+		const presenceUserId =
+			await getAuthenticatedUserId(presenceCookie);
 
 		console.log(
 			`Utilisateur authentifié : ${TEST_USER.username} ` +
@@ -420,6 +495,74 @@ async function main(): Promise<void> {
 		socket = await connectSocket(cookie);
 
 		console.log("Socket connecté :", socket.id);
+
+		const onlinePromise =
+			waitForPresenceEvent(socket, "userOnline");
+
+		presenceSocket1 =
+			await connectSocket(presenceCookie);
+
+		const onlineEvent = await onlinePromise;
+
+		console.log(
+			"Événement userOnline reçu :",
+			onlineEvent,
+		);
+
+		if (onlineEvent.userId !== presenceUserId) {
+			throw new Error(
+				"userOnline contient un identifiant invalide.",
+			);
+		}
+
+		const noSecondOnlinePromise =
+			expectNoPresenceEvent(
+				socket,
+				"userOnline",
+			);
+
+		presenceSocket2 =
+			await connectSocket(presenceCookie);
+
+		await noSecondOnlinePromise;
+
+		console.log(
+			"Aucun userOnline émis pour le second socket.",
+		);
+
+		const noEarlyOfflinePromise =
+			expectNoPresenceEvent(
+				socket,
+				"userOffline",
+			);
+
+		presenceSocket1.disconnect();
+		presenceSocket1 = null;
+
+		await noEarlyOfflinePromise;
+
+		console.log(
+			"Aucun userOffline émis tant qu'un socket reste connecté.",
+		);
+
+		const offlinePromise =
+			waitForPresenceEvent(socket, "userOffline");
+
+		presenceSocket2.disconnect();
+		presenceSocket2 = null;
+
+		const offlineEvent = await offlinePromise;
+
+		console.log(
+			"Événement userOffline reçu :",
+			offlineEvent,
+		);
+
+		if (offlineEvent.userId !== presenceUserId) {
+			throw new Error(
+				"userOffline contient un identifiant invalide.",
+			);
+		}
 
 		const allowedResponse = await emitWithAck(
 			socket,
@@ -718,6 +861,14 @@ async function main(): Promise<void> {
 
 		console.log("Test Socket.IO réussi.");
 	} finally {
+		if (presenceSocket2) {
+			presenceSocket2.disconnect();
+		}
+
+		if (presenceSocket1) {
+			presenceSocket1.disconnect();
+		}
+
 		if (receiverSocket) {
 			receiverSocket.disconnect();
 		}
