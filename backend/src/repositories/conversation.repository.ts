@@ -161,6 +161,34 @@ export class ConversationRepository {
 		});
 	}
 
+	async findMessageById(
+		messageId: number,
+	) {
+		return prisma.message.findUnique({
+			where: {
+				id: messageId,
+			},
+		});
+	}
+
+	async markConversationRead(
+		conversationId: number,
+		userId: number,
+		messageId: number,
+	) {
+		return prisma.conversationParticipant.update({
+			where: {
+				conversationId_userId: {
+					conversationId,
+					userId,
+				},
+			},
+			data: {
+				lastReadMessageId: messageId,
+			},
+		});
+	}
+
 }
 
 export const conversationRepository =

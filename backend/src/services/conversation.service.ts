@@ -200,6 +200,71 @@ export class ConversationService {
 	}
 
 
+	async markConversationRead(
+		conversationId: number,
+		userId: number,
+		messageId: number,
+	) {
+		if (
+			!Number.isInteger(conversationId) ||
+			conversationId <= 0
+		) {
+			throw new HttpError(
+				400,
+				"Invalid conversation id",
+			);
+		}
+
+		if (
+			!Number.isInteger(messageId) ||
+			messageId <= 0
+		) {
+			throw new HttpError(
+				400,
+				"Invalid message id",
+			);
+		}
+
+		const isParticipant =
+			await conversationRepository.isParticipant(
+				conversationId,
+				userId,
+			);
+
+		if (!isParticipant) {
+			throw new HttpError(
+				403,
+				"You are not a participant in this conversation",
+			);
+		}
+
+		const message =
+			await conversationRepository.findMessageById(
+				messageId,
+			);
+
+		if (!message) {
+			throw new HttpError(
+				404,
+				"Message not found",
+			);
+		}
+
+		if (message.conversationId !== conversationId) {
+			throw new HttpError(
+				400,
+				"Message does not belong to this conversation",
+			);
+		}
+
+		return conversationRepository.markConversationRead(
+			conversationId,
+			userId,
+			messageId,
+		);
+	}
+
+
 	async ensureParticipant(
 		conversationId: number,
 		userId: number,
