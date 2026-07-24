@@ -235,17 +235,23 @@ async function getAuthenticatedUserId(
 	return userId as number;
 }
 
-function createTestConversation(userId: number): number {
+function createTestConversation(
+	userId: number,
+	otherUserId: number,
+): number {
 	const result = runSql(`
 WITH new_conversation AS (
 	INSERT INTO "Conversation" ("createdAt", "updatedAt")
 	VALUES (NOW(), NOW())
 	RETURNING "id"
 ),
-new_participant AS (
+new_participants AS (
 	INSERT INTO "ConversationParticipant"
 		("conversationId", "userId", "joinedAt")
 	SELECT "id", ${userId}, NOW()
+	FROM new_conversation
+	UNION ALL
+	SELECT "id", ${otherUserId}, NOW()
 	FROM new_conversation
 )
 SELECT "id"
@@ -486,7 +492,7 @@ async function main(): Promise<void> {
 				`(id ${userId})`,
 		);
 
-		conversationId = createTestConversation(userId);
+		conversationId = createTestConversation(userId, presenceUserId);
 
 		console.log(
 			`Conversation temporaire créée : ${conversationId}`,

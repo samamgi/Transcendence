@@ -1,4 +1,5 @@
 import { HttpError } from "../lib/http-error.js";
+import { blockRepository } from "../repositories/block.repository.js";
 import { conversationRepository } from "../repositories/conversation.repository.js";
 import { userRepository } from "../repositories/user.repository.js";
 
@@ -31,6 +32,19 @@ export class ConversationService {
 			throw new HttpError(
 				404,
 				"User not found",
+			);
+		}
+
+		const blocked =
+			await blockRepository.isBlockedBetween(
+				currentUserId,
+				otherUserId,
+			);
+
+		if (blocked) {
+			throw new HttpError(
+				403,
+				"You cannot create a conversation with this user",
 			);
 		}
 
@@ -129,6 +143,44 @@ export class ConversationService {
 			throw new HttpError(
 				403,
 				"You are not a participant in this conversation",
+			);
+		}
+
+		const conversation =
+			await conversationRepository.findConversationParticipantIds(
+				conversationId,
+			);
+
+		if (!conversation) {
+			throw new HttpError(
+				404,
+				"Conversation not found",
+			);
+		}
+
+		const otherParticipant =
+			conversation.participants.find(
+				(participant) =>
+					participant.userId !== userId,
+			);
+
+		if (!otherParticipant) {
+			throw new HttpError(
+				400,
+				"Conversation has no other participant",
+			);
+		}
+
+		const blocked =
+			await blockRepository.isBlockedBetween(
+				userId,
+				otherParticipant.userId,
+			);
+
+		if (blocked) {
+			throw new HttpError(
+				403,
+				"You cannot send messages to this user",
 			);
 		}
 

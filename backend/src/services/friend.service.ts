@@ -1,4 +1,5 @@
 import { HttpError } from "../lib/http-error.js";
+import { blockRepository } from "../repositories/block.repository.js";
 import { friendRepository } from "../repositories/friend.repository.js";
 
 export class FriendService {
@@ -22,6 +23,19 @@ export class FriendService {
 
 		if (!receiver) {
 			throw new HttpError(404, "User not found");
+		}
+
+		const block =
+			await blockRepository.isBlockedBetween(
+				senderId,
+				receiverId,
+			);
+
+		if (block) {
+			throw new HttpError(
+				403,
+				"You cannot send a friend request to this user",
+			);
 		}
 
 		const friendship =

@@ -161,6 +161,23 @@ export class ConversationRepository {
 		return participant !== null;
 	}
 
+	async findConversationParticipantIds(
+		conversationId: number,
+	) {
+		return prisma.conversation.findUnique({
+			where: {
+				id: conversationId,
+			},
+			select: {
+				participants: {
+					select: {
+						userId: true,
+					},
+				},
+			},
+		});
+	}
+
 	async createMessage(
 		conversationId: number,
 		senderId: number,

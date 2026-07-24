@@ -7,6 +7,7 @@ import { sessionMiddleware } from "./config/session.js";
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import friendRoutes from "./routes/friend.routes.js";
+import blockRoutes from "./routes/block.routes.js";
 import conversationRoutes from "./routes/conversation.routes.js";
 import { errorHandler } from "./middlewares/error-handler.middleware.js";
 import { initializeSocket } from "./socket/index.js";
@@ -51,6 +52,7 @@ app.get("/health/database", async (_request, response) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/friends", friendRoutes);
+app.use("/api/blocks", blockRoutes);
 app.use("/api/conversations", conversationRoutes);
 
 app.use((_request, response) => {
