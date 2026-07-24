@@ -192,6 +192,55 @@ export class ConversationService {
 	}
 
 
+	async updateMessage(
+		messageId: number,
+		userId: number,
+		content: string,
+	) {
+		if (
+			!Number.isInteger(messageId) ||
+			messageId <= 0
+		) {
+			throw new HttpError(
+				400,
+				"Invalid message id",
+			);
+		}
+
+		const trimmedContent = content.trim();
+
+		if (trimmedContent.length === 0) {
+			throw new HttpError(
+				400,
+				"Message content is required",
+			);
+		}
+
+		const message =
+			await conversationRepository.findMessageById(
+				messageId,
+			);
+
+		if (!message) {
+			throw new HttpError(
+				404,
+				"Message not found",
+			);
+		}
+
+		if (message.senderId !== userId) {
+			throw new HttpError(
+				403,
+				"You can only edit your own messages",
+			);
+		}
+
+		return conversationRepository.updateMessage(
+			messageId,
+			trimmedContent,
+		);
+	}
+
 	async getMessages(
 		conversationId: number,
 		userId: number,

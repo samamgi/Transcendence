@@ -26,6 +26,16 @@ router.post(
 	),
 );
 
+router.patch(
+	"/messages/:messageId",
+	requireAuth,
+	asyncHandler(
+		conversationController.updateMessage.bind(
+			conversationController,
+		),
+	),
+);
+
 router.delete(
 	"/:conversationId",
 	requireAuth,

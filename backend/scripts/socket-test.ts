@@ -54,6 +54,66 @@ type ConversationDeletedEvent = {
 	conversationId: number;
 };
 
+
+type MessageUpdatedEvent = {
+	id: number;
+	conversationId: number;
+	senderId: number;
+	content: string;
+	createdAt: string;
+	updatedAt: string;
+};
+
+function waitForMessageUpdated(
+	socket: Socket,
+): Promise<MessageUpdatedEvent> {
+	return new Promise((resolve, reject) => {
+		const timeout = setTimeout(() => {
+			socket.off(
+				"messageUpdated",
+				onMessageUpdated,
+			);
+			reject(
+				new Error(
+					"Aucun événement messageUpdated reçu dans les 5 secondes.",
+				),
+			);
+		}, 5000);
+
+		function onMessageUpdated(
+			payload: MessageUpdatedEvent,
+		): void {
+			clearTimeout(timeout);
+			resolve(payload);
+		}
+
+		socket.once(
+			"messageUpdated",
+			onMessageUpdated,
+		);
+	});
+}
+
+async function updateMessageHttp(
+	cookie: string,
+	messageId: number,
+	content: string,
+): Promise<Response> {
+	return fetch(
+		`${API_URL}/api/conversations/messages/${messageId}`,
+		{
+			method: "PATCH",
+			headers: {
+				Cookie: cookie,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				content,
+			}),
+		},
+	);
+}
+
 function waitForConversationDeleted(
 	socket: Socket,
 ): Promise<ConversationDeletedEvent> {
@@ -863,6 +923,61 @@ async function main(): Promise<void> {
 		) {
 			throw new Error(
 				"Le contenu de l'événement messageRead est invalide.",
+			);
+		}
+
+		const messageUpdatedPromise =
+			waitForMessageUpdated(
+				receiverSocket,
+			);
+
+		const updateResponse =
+			await updateMessageHttp(
+				cookie,
+				sendResponse.message.id,
+				"Message modifié",
+			);
+
+		if (!updateResponse.ok) {
+			throw new Error(
+				`PATCH /messages a échoué (${updateResponse.status})`,
+			);
+		}
+
+		const updatedMessage =
+			await messageUpdatedPromise;
+
+		console.log(
+			"Événement messageUpdated reçu :",
+			updatedMessage,
+		);
+
+		if (
+			updatedMessage.id !==
+				sendResponse.message.id ||
+			updatedMessage.content !==
+				"Message modifié"
+		) {
+			throw new Error(
+				"Le contenu de messageUpdated est invalide.",
+			);
+		}
+
+		const forbiddenUpdateResponse =
+			await updateMessageHttp(
+				presenceCookie,
+				sendResponse.message.id,
+				"Modification interdite",
+			);
+
+		console.log(
+			"Modification interdite par un autre utilisateur :",
+			forbiddenUpdateResponse.status,
+		);
+
+		if (forbiddenUpdateResponse.status !== 403) {
+			throw new Error(
+				`La modification par un autre utilisateur devait retourner 403, reçu ${forbiddenUpdateResponse.status}.`,
 			);
 		}
 

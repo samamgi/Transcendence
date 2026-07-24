@@ -203,6 +203,30 @@ export class ConversationRepository {
 	}
 
 
+	async updateMessage(
+		messageId: number,
+		content: string,
+	) {
+		return prisma.message.update({
+			where: {
+				id: messageId,
+			},
+			data: {
+				content,
+			},
+			include: {
+				sender: {
+					select: {
+						id: true,
+						username: true,
+						displayName: true,
+						avatarUrl: true,
+					},
+				},
+			},
+		});
+	}
+
 	async findMessages(
 		conversationId: number,
 		limit: number,

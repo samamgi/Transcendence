@@ -139,6 +139,43 @@ export class ConversationController {
 
 
 
+	async updateMessage(
+		request: Request,
+		response: Response,
+	): Promise<void> {
+		const userId = request.session.userId;
+
+		if (userId === undefined) {
+			response.status(401).json({
+				error: "Authentication required",
+			});
+			return;
+		}
+
+		const messageId = Number(
+			request.params.messageId,
+		);
+
+		const { content } = request.body;
+
+		const message =
+			await conversationService.updateMessage(
+				messageId,
+				userId,
+				content,
+			);
+
+		getIO()
+			.to(
+				`conversation:${message.conversationId}`,
+			)
+			.emit("messageUpdated", message);
+
+		response.status(200).json({
+			message,
+		});
+	}
+
 	async getMessages(
 		request: Request,
 		response: Response,
