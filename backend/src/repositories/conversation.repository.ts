@@ -264,6 +264,17 @@ export class ConversationRepository {
 		});
 	}
 
+
+	async deleteConversation(
+		conversationId: number,
+	) {
+		return prisma.conversation.delete({
+			where: {
+				id: conversationId,
+			},
+		});
+	}
+
 }
 
 export const conversationRepository =

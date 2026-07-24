@@ -49,6 +49,56 @@ type TypingEvent = {
 	userId: number;
 };
 
+
+type ConversationDeletedEvent = {
+	conversationId: number;
+};
+
+function waitForConversationDeleted(
+	socket: Socket,
+): Promise<ConversationDeletedEvent> {
+	return new Promise((resolve, reject) => {
+		const timeout = setTimeout(() => {
+			socket.off(
+				"conversationDeleted",
+				onConversationDeleted,
+			);
+			reject(
+				new Error(
+					"Aucun événement conversationDeleted reçu dans les 5 secondes.",
+				),
+			);
+		}, 5000);
+
+		function onConversationDeleted(
+			payload: ConversationDeletedEvent,
+		): void {
+			clearTimeout(timeout);
+			resolve(payload);
+		}
+
+		socket.once(
+			"conversationDeleted",
+			onConversationDeleted,
+		);
+	});
+}
+
+async function deleteConversationHttp(
+	cookie: string,
+	conversationId: number,
+): Promise<Response> {
+	return fetch(
+		`${API_URL}/api/conversations/${conversationId}`,
+		{
+			method: "DELETE",
+			headers: {
+				Cookie: cookie,
+			},
+		},
+	);
+}
+
 type MessageReadEvent = {
 	conversationId: number;
 	userId: number;
@@ -973,6 +1023,48 @@ async function main(): Promise<void> {
 		if (forbiddenSendResponse.success) {
 			throw new Error(
 				"Un message a été envoyé dans une conversation non autorisée.",
+			);
+		}
+
+
+		const deletedPromiseAlice =
+			waitForConversationDeleted(socket);
+
+		const deletedPromiseBob =
+			waitForConversationDeleted(receiverSocket);
+
+		const deleteResponse =
+			await deleteConversationHttp(
+				cookie,
+				conversationId,
+			);
+
+		if (!deleteResponse.ok) {
+			throw new Error(
+				`DELETE /conversations a échoué (${deleteResponse.status})`,
+			);
+		}
+
+		const deletedAlice =
+			await deletedPromiseAlice;
+
+		const deletedBob =
+			await deletedPromiseBob;
+
+		console.log(
+			"Événement conversationDeleted reçu :",
+			deletedAlice,
+			deletedBob,
+		);
+
+		if (
+			deletedAlice.conversationId !==
+				conversationId ||
+			deletedBob.conversationId !==
+				conversationId
+		) {
+			throw new Error(
+				"conversationDeleted contient un mauvais identifiant.",
 			);
 		}
 

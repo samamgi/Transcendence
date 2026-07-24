@@ -98,6 +98,47 @@ export class ConversationController {
 	}
 
 
+	async deleteConversation(
+		request: Request,
+		response: Response,
+	): Promise<void> {
+		const userId = request.session.userId;
+
+		if (userId === undefined) {
+			response.status(401).json({
+				error: "Authentication required",
+			});
+			return;
+		}
+
+		const conversationId = Number(
+			request.params.conversationId,
+		);
+
+		const conversation =
+			await conversationService.deleteConversation(
+				conversationId,
+				userId,
+			);
+
+		for (const participant of conversation.participants) {
+			getIO()
+				.to(`user:${participant.userId}`)
+				.emit(
+					"conversationDeleted",
+					{
+						conversationId,
+					},
+				);
+		}
+
+		response.status(200).json({
+			message: "Conversation deleted",
+		});
+	}
+
+
+
 	async getMessages(
 		request: Request,
 		response: Response,

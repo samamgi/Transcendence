@@ -318,6 +318,54 @@ export class ConversationService {
 	}
 
 
+	async deleteConversation(
+		conversationId: number,
+		userId: number,
+	) {
+		if (
+			!Number.isInteger(conversationId) ||
+			conversationId <= 0
+		) {
+			throw new HttpError(
+				400,
+				"Invalid conversation id",
+			);
+		}
+
+		const isParticipant =
+			await conversationRepository.isParticipant(
+				conversationId,
+				userId,
+			);
+
+		if (!isParticipant) {
+			throw new HttpError(
+				403,
+				"You are not a participant in this conversation",
+			);
+		}
+
+		const conversation =
+			await conversationRepository.findConversationParticipantIds(
+				conversationId,
+			);
+
+		if (!conversation) {
+			throw new HttpError(
+				404,
+				"Conversation not found",
+			);
+		}
+
+		await conversationRepository.deleteConversation(
+			conversationId,
+		);
+
+		return conversation;
+	}
+
+
+
 	async ensureParticipant(
 		conversationId: number,
 		userId: number,
