@@ -133,6 +133,8 @@ export function initializeSocket(
 			`User ${userId} connected (${socket.id})`,
 		);
 
+		void socket.join(`user:${userId}`);
+
 		socket.on(
 			"joinConversation",
 			async (

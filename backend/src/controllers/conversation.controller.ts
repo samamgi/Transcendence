@@ -3,17 +3,38 @@ import type {
 	Response,
 } from "express";
 import { conversationService } from "../services/conversation.service.js";
+import { getIO } from "../socket/index.js";
 
 export class ConversationController {
 	async createOrGetPrivateConversation(
 		request: Request,
 		response: Response,
-	) {
+	): Promise<void> {
+		const currentUserId = request.session.userId;
+
+		if (currentUserId === undefined) {
+			response.status(401).json({
+				error: "Authentication required",
+			});
+			return;
+		}
+
+		const otherUserId = Number(request.body.userId);
+
 		const result =
 			await conversationService.createOrGetPrivateConversation(
-				request.session.userId!,
-				Number(request.body.userId),
+				currentUserId,
+				otherUserId,
 			);
+
+		if (result.created) {
+			getIO()
+				.to(`user:${otherUserId}`)
+				.emit(
+					"conversationCreated",
+					result.conversation,
+				);
+		}
 
 		response
 			.status(result.created ? 201 : 200)
