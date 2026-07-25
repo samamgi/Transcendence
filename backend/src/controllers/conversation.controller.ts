@@ -81,6 +81,61 @@ export class ConversationController {
 		});
 	}
 
+	async leaveGroupConversation(
+		request: Request,
+		response: Response,
+	): Promise<void> {
+		const userId = request.session.userId;
+
+		if (userId === undefined) {
+			response.status(401).json({
+				error: "Authentication required",
+			});
+			return;
+		}
+
+		const conversationId = Number(
+			request.params.conversationId,
+		);
+
+		const result =
+			await conversationService.leaveGroupConversation(
+				userId,
+				conversationId,
+			);
+
+		getIO()
+			.to(`user:${userId}`)
+			.emit(
+				"conversationDeleted",
+				{
+					conversationId,
+				},
+			);
+
+		if (!result.deleted) {
+			for (
+				const participant
+				of result.conversation.participants
+			) {
+				getIO()
+					.to(`user:${participant.userId}`)
+					.emit(
+						"conversationUpdated",
+						result.conversation,
+					);
+			}
+		}
+
+		response.status(200).json({
+			message: result.deleted
+				? "Group conversation deleted"
+				: "You left the group",
+			deleted: result.deleted,
+			conversation: result.conversation,
+		});
+	}
+
 	async removeGroupMember(
 		request: Request,
 		response: Response,

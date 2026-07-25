@@ -27,6 +27,16 @@ router.post(
 );
 
 router.delete(
+	"/groups/:conversationId/leave",
+	requireAuth,
+	asyncHandler(
+		conversationController.leaveGroupConversation.bind(
+			conversationController,
+		),
+	),
+);
+
+router.delete(
 	"/groups/:conversationId/members/:memberId",
 	requireAuth,
 	asyncHandler(

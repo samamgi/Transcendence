@@ -133,6 +133,75 @@ export class ConversationRepository {
 		});
 	}
 
+	async leaveGroupConversation(
+		conversationId: number,
+		userId: number,
+		newOwnerId: number | undefined,
+		deleteConversation: boolean,
+	) {
+		return prisma.$transaction(async (transaction) => {
+			await transaction.conversationParticipant.deleteMany({
+				where: {
+					conversationId,
+					userId,
+				},
+			});
+
+			if (deleteConversation) {
+				await transaction.conversation.delete({
+					where: {
+						id: conversationId,
+					},
+				});
+
+				return {
+					deleted: true as const,
+					conversation: null,
+				};
+			}
+
+			const conversation =
+				await transaction.conversation.update({
+					where: {
+						id: conversationId,
+					},
+					data:
+						newOwnerId === undefined
+							? {}
+							: {
+								ownerId: newOwnerId,
+							},
+					include: {
+						owner: {
+							select: {
+								id: true,
+								username: true,
+								displayName: true,
+								avatarUrl: true,
+							},
+						},
+						participants: {
+							include: {
+								user: {
+									select: {
+										id: true,
+										username: true,
+										displayName: true,
+										avatarUrl: true,
+									},
+								},
+							},
+						},
+					},
+				});
+
+			return {
+				deleted: false as const,
+				conversation,
+			};
+		});
+	}
+
 	async removeGroupMember(
 		conversationId: number,
 		userId: number,

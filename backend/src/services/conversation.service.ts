@@ -180,6 +180,75 @@ export class ConversationService {
 		);
 	}
 
+	async leaveGroupConversation(
+		userId: number,
+		conversationId: number,
+	) {
+		if (
+			!Number.isInteger(conversationId) ||
+			conversationId <= 0
+		) {
+			throw new HttpError(
+				400,
+				"Invalid conversation ID",
+			);
+		}
+
+		const conversation =
+			await conversationRepository.findGroupForMembership(
+				conversationId,
+			);
+
+		if (!conversation) {
+			throw new HttpError(
+				404,
+				"Group conversation not found",
+			);
+		}
+
+		const isMember = conversation.participants.some(
+			(participant) =>
+				participant.userId === userId,
+		);
+
+		if (!isMember) {
+			throw new HttpError(
+				403,
+				"You are not a member of this group",
+			);
+		}
+
+		const remainingMemberIds =
+			conversation.participants
+				.map((participant) => participant.userId)
+				.filter(
+					(participantId) =>
+						participantId !== userId,
+				)
+				.sort((firstId, secondId) =>
+					firstId - secondId,
+				);
+
+		const deleteConversation =
+			remainingMemberIds.length === 0;
+
+		let newOwnerId: number | undefined;
+
+		if (
+			!deleteConversation &&
+			conversation.ownerId === userId
+		) {
+			newOwnerId = remainingMemberIds[0];
+		}
+
+		return conversationRepository.leaveGroupConversation(
+			conversationId,
+			userId,
+			newOwnerId,
+			deleteConversation,
+		);
+	}
+
 	async removeGroupMember(
 		ownerId: number,
 		conversationId: number,

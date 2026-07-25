@@ -17,6 +17,12 @@ const PRESENCE_TEST_USER = {
 	password: "BobTest123!",
 };
 
+const GROUP_TEST_USER = {
+	username: "charlie_socket_group",
+	email: "charlie.socket.group@example.com",
+	password: "CharlieTest123!",
+};
+
 type SocketMessage = {
 	id: number;
 	conversationId: number;
@@ -54,6 +60,30 @@ type ConversationDeletedEvent = {
 	conversationId: number;
 };
 
+type GroupConversation = {
+	id: number;
+	type?: string;
+	name?: string | null;
+	ownerId?: number | null;
+	participants?: Array<{
+		userId?: number;
+		user?: {
+			id: number;
+			username?: string;
+		};
+	}>;
+};
+
+type GroupConversationResponse = {
+	success?: boolean;
+	conversation?: GroupConversation;
+	error?: string;
+};
+
+type ConversationCreatedEvent = GroupConversation;
+
+type ConversationUpdatedEvent = GroupConversation;
+
 
 type MessageUpdatedEvent = {
 	id: number;
@@ -88,6 +118,143 @@ type RemovedReaction = {
 	conversationId: number;
 	userId: number;
 };
+
+function waitForConversationCreated(
+	socket: Socket,
+): Promise<ConversationCreatedEvent> {
+	return new Promise((resolve, reject) => {
+		const timeout = setTimeout(() => {
+			socket.off(
+				"conversationCreated",
+				onConversationCreated,
+			);
+			reject(
+				new Error(
+					"Aucun événement conversationCreated reçu dans les 5 secondes.",
+				),
+			);
+		}, 5000);
+
+		function onConversationCreated(
+			payload: ConversationCreatedEvent,
+		): void {
+			clearTimeout(timeout);
+			resolve(payload);
+		}
+
+		socket.once(
+			"conversationCreated",
+			onConversationCreated,
+		);
+	});
+}
+
+function waitForConversationUpdated(
+	socket: Socket,
+): Promise<ConversationUpdatedEvent> {
+	return new Promise((resolve, reject) => {
+		const timeout = setTimeout(() => {
+			socket.off(
+				"conversationUpdated",
+				onConversationUpdated,
+			);
+			reject(
+				new Error(
+					"Aucun événement conversationUpdated reçu dans les 5 secondes.",
+				),
+			);
+		}, 5000);
+
+		function onConversationUpdated(
+			payload: ConversationUpdatedEvent,
+		): void {
+			clearTimeout(timeout);
+			resolve(payload);
+		}
+
+		socket.once(
+			"conversationUpdated",
+			onConversationUpdated,
+		);
+	});
+}
+
+async function createGroupConversationHttp(
+	cookie: string,
+	name: string,
+	memberIds: number[],
+): Promise<Response> {
+	return fetch(
+		`${API_URL}/api/conversations/groups`,
+		{
+			method: "POST",
+			headers: {
+				Cookie: cookie,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				name,
+				memberIds,
+			}),
+		},
+	);
+}
+
+async function renameGroupConversationHttp(
+	cookie: string,
+	conversationId: number,
+	name: string,
+): Promise<Response> {
+	return fetch(
+		`${API_URL}/api/conversations/groups/${conversationId}/name`,
+		{
+			method: "PATCH",
+			headers: {
+				Cookie: cookie,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				name,
+			}),
+		},
+	);
+}
+
+async function addGroupMemberHttp(
+	cookie: string,
+	conversationId: number,
+	memberId: number,
+): Promise<Response> {
+	return fetch(
+		`${API_URL}/api/conversations/groups/${conversationId}/members`,
+		{
+			method: "POST",
+			headers: {
+				Cookie: cookie,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				memberId,
+			}),
+		},
+	);
+}
+
+async function removeGroupMemberHttp(
+	cookie: string,
+	conversationId: number,
+	memberId: number,
+): Promise<Response> {
+	return fetch(
+		`${API_URL}/api/conversations/groups/${conversationId}/members/${memberId}`,
+		{
+			method: "DELETE",
+			headers: {
+				Cookie: cookie,
+			},
+		},
+	);
+}
 
 function waitForMessageReactionAdded(
 	socket: Socket,
@@ -774,14 +941,17 @@ async function connectSocket(cookie: string): Promise<Socket> {
 
 async function main(): Promise<void> {
 	let conversationId: number | null = null;
+	let groupConversationId: number | null = null;
 	let socket: Socket | null = null;
 	let receiverSocket: Socket | null = null;
+	let groupMemberSocket: Socket | null = null;
 	let presenceSocket1: Socket | null = null;
 	let presenceSocket2: Socket | null = null;
 
 	try {
 		await ensureTestUser();
 		await ensureTestUser(PRESENCE_TEST_USER);
+		await ensureTestUser(GROUP_TEST_USER);
 
 		const cookie = await login();
 		const userId = await getAuthenticatedUserId(cookie);
@@ -791,6 +961,12 @@ async function main(): Promise<void> {
 
 		const presenceUserId =
 			await getAuthenticatedUserId(presenceCookie);
+
+		const groupMemberCookie =
+			await login(GROUP_TEST_USER);
+
+		const groupMemberUserId =
+			await getAuthenticatedUserId(groupMemberCookie);
 
 		console.log(
 			`Utilisateur authentifié : ${TEST_USER.username} ` +
@@ -902,6 +1078,15 @@ async function main(): Promise<void> {
 			receiverSocket.id,
 		);
 
+		groupMemberSocket = await connectSocket(
+			groupMemberCookie,
+		);
+
+		console.log(
+			"Socket du troisième utilisateur connecté :",
+			groupMemberSocket.id,
+		);
+
 		const receiverJoinResponse = await emitWithAck(
 			receiverSocket,
 			"joinConversation",
@@ -914,6 +1099,415 @@ async function main(): Promise<void> {
 					(receiverJoinResponse.error ?? "erreur inconnue"),
 			);
 		}
+
+		/*
+		 * Conversations de groupe :
+		 * création, renommage et contrôle du propriétaire.
+		 */
+		const groupCreatedForOwnerPromise =
+			waitForConversationCreated(socket);
+
+		const groupCreatedForMemberPromise =
+			waitForConversationCreated(receiverSocket);
+
+		const initialGroupName =
+			"Groupe Socket.IO initial";
+
+		const createGroupResponse =
+			await createGroupConversationHttp(
+				cookie,
+				initialGroupName,
+				[presenceUserId],
+			);
+
+		const createGroupBody =
+			(await createGroupResponse.json()) as
+				GroupConversationResponse;
+
+		if (
+			!createGroupResponse.ok ||
+			!createGroupBody.conversation
+		) {
+			throw new Error(
+				`La création du groupe a échoué ` +
+				`(${createGroupResponse.status}) : ` +
+				(createGroupBody.error ??
+					JSON.stringify(createGroupBody)),
+			);
+		}
+
+		groupConversationId =
+			createGroupBody.conversation.id;
+
+		if (!Number.isInteger(groupConversationId)) {
+			throw new Error(
+				"La création du groupe n'a renvoyé aucun identifiant valide.",
+			);
+		}
+
+		const groupCreatedForOwner =
+			await groupCreatedForOwnerPromise;
+
+		const groupCreatedForMember =
+			await groupCreatedForMemberPromise;
+
+		console.log(
+			"Groupe créé :",
+			createGroupBody.conversation,
+		);
+
+		if (
+			groupCreatedForOwner.id !==
+				groupConversationId ||
+			groupCreatedForMember.id !==
+				groupConversationId
+		) {
+			throw new Error(
+				"conversationCreated contient un mauvais identifiant de groupe.",
+			);
+		}
+
+		if (
+			createGroupBody.conversation.name !==
+			initialGroupName
+		) {
+			throw new Error(
+				"Le nom initial du groupe est incorrect.",
+			);
+		}
+
+		if (
+			createGroupBody.conversation.type &&
+			createGroupBody.conversation.type !== "GROUP"
+		) {
+			throw new Error(
+				"La conversation créée n'est pas de type GROUP.",
+			);
+		}
+
+		if (
+			createGroupBody.conversation.ownerId !==
+			undefined &&
+			createGroupBody.conversation.ownerId !==
+			userId
+		) {
+			throw new Error(
+				"Le propriétaire du groupe est incorrect.",
+			);
+		}
+
+		const renamedGroupName =
+			"Groupe Socket.IO renommé";
+
+		const groupUpdatedForOwnerPromise =
+			waitForConversationUpdated(socket);
+
+		const groupUpdatedForMemberPromise =
+			waitForConversationUpdated(receiverSocket);
+
+		const renameGroupResponse =
+			await renameGroupConversationHttp(
+				cookie,
+				groupConversationId,
+				renamedGroupName,
+			);
+
+		const renameGroupBody =
+			(await renameGroupResponse.json()) as
+				GroupConversationResponse;
+
+		if (
+			!renameGroupResponse.ok ||
+			!renameGroupBody.conversation
+		) {
+			throw new Error(
+				`Le renommage du groupe a échoué ` +
+				`(${renameGroupResponse.status}) : ` +
+				(renameGroupBody.error ??
+					JSON.stringify(renameGroupBody)),
+			);
+		}
+
+		const groupUpdatedForOwner =
+			await groupUpdatedForOwnerPromise;
+
+		const groupUpdatedForMember =
+			await groupUpdatedForMemberPromise;
+
+		console.log(
+			"Groupe renommé :",
+			renameGroupBody.conversation,
+		);
+
+		if (
+			renameGroupBody.conversation.name !==
+				renamedGroupName ||
+			groupUpdatedForOwner.name !==
+				renamedGroupName ||
+			groupUpdatedForMember.name !==
+				renamedGroupName
+		) {
+			throw new Error(
+				"Le nouveau nom du groupe n'a pas été propagé correctement.",
+			);
+		}
+
+		if (
+			groupUpdatedForOwner.id !==
+				groupConversationId ||
+			groupUpdatedForMember.id !==
+				groupConversationId
+		) {
+			throw new Error(
+				"conversationUpdated contient un mauvais identifiant.",
+			);
+		}
+
+		const forbiddenRenameResponse =
+			await renameGroupConversationHttp(
+				presenceCookie,
+				groupConversationId,
+				"Renommage interdit",
+			);
+
+		console.log(
+			"Renommage par un non-propriétaire :",
+			forbiddenRenameResponse.status,
+		);
+
+		if (forbiddenRenameResponse.ok) {
+			throw new Error(
+				"Un membre non propriétaire a pu renommer le groupe.",
+			);
+		}
+
+		const storedGroupName = runSql(`
+SELECT "name"
+FROM "Conversation"
+WHERE "id" = ${groupConversationId};
+`);
+
+		if (storedGroupName !== renamedGroupName) {
+			throw new Error(
+				"Le renommage interdit a modifié le groupe en base de données.",
+			);
+		}
+
+		console.log(
+			"Tests de création et de renommage de groupe réussis.",
+		);
+
+		/*
+		 * Ajout d'un troisième membre.
+		 */
+		const memberAddedForOwnerPromise =
+			waitForConversationUpdated(socket);
+
+		const memberAddedForExistingMemberPromise =
+			waitForConversationUpdated(receiverSocket);
+
+		const memberAddedForNewMemberPromise =
+			waitForConversationCreated(groupMemberSocket);
+
+		const addMemberResponse =
+			await addGroupMemberHttp(
+				cookie,
+				groupConversationId,
+				groupMemberUserId,
+			);
+
+		const addMemberBody =
+			(await addMemberResponse.json()) as
+				GroupConversationResponse;
+
+		if (
+			!addMemberResponse.ok ||
+			!addMemberBody.conversation
+		) {
+			throw new Error(
+				`L'ajout du membre a échoué ` +
+				`(${addMemberResponse.status}) : ` +
+				(addMemberBody.error ??
+					JSON.stringify(addMemberBody)),
+			);
+		}
+
+		const memberAddedForOwner =
+			await memberAddedForOwnerPromise;
+
+		const memberAddedForExistingMember =
+			await memberAddedForExistingMemberPromise;
+
+		const memberAddedForNewMember =
+			await memberAddedForNewMemberPromise;
+
+		if (
+			memberAddedForOwner.id !== groupConversationId ||
+			memberAddedForExistingMember.id !==
+				groupConversationId
+		) {
+			throw new Error(
+				"conversationUpdated contient un mauvais groupe après l'ajout.",
+			);
+		}
+
+		if (
+			memberAddedForNewMember.id !==
+				groupConversationId
+		) {
+			throw new Error(
+				"conversationCreated contient un mauvais groupe pour le nouveau membre.",
+			);
+		}
+
+		const addedMemberCount = Number.parseInt(
+			runSql(`
+SELECT COUNT(*)
+FROM "ConversationParticipant"
+WHERE "conversationId" = ${groupConversationId}
+AND "userId" = ${groupMemberUserId};
+`),
+			10,
+		);
+
+		if (addedMemberCount !== 1) {
+			throw new Error(
+				"Le troisième membre n'a pas été ajouté correctement en base.",
+			);
+		}
+
+		console.log(
+			"Troisième membre ajouté au groupe :",
+			groupMemberUserId,
+		);
+
+		/*
+		 * Un même membre ne doit pas pouvoir être ajouté deux fois.
+		 */
+		const duplicateMemberResponse =
+			await addGroupMemberHttp(
+				cookie,
+				groupConversationId,
+				groupMemberUserId,
+			);
+
+		console.log(
+			"Ajout d'un membre déjà présent :",
+			duplicateMemberResponse.status,
+		);
+
+		if (duplicateMemberResponse.ok) {
+			throw new Error(
+				"Un membre déjà présent a pu être ajouté une seconde fois.",
+			);
+		}
+
+		/*
+		 * Un membre non propriétaire ne peut pas ajouter quelqu'un.
+		 */
+		const forbiddenAddResponse =
+			await addGroupMemberHttp(
+				presenceCookie,
+				groupConversationId,
+				groupMemberUserId,
+			);
+
+		console.log(
+			"Ajout par un non-propriétaire :",
+			forbiddenAddResponse.status,
+		);
+
+		if (forbiddenAddResponse.ok) {
+			throw new Error(
+				"Un membre non propriétaire a pu ajouter un membre.",
+			);
+		}
+
+		/*
+		 * Retrait du troisième membre.
+		 */
+		const memberRemovedForOwnerPromise =
+			waitForConversationUpdated(socket);
+
+		const memberRemovedForRemainingMemberPromise =
+			waitForConversationUpdated(receiverSocket);
+
+		const removedMemberDeletedPromise =
+			waitForConversationDeleted(groupMemberSocket);
+
+		const removeMemberResponse =
+			await removeGroupMemberHttp(
+				cookie,
+				groupConversationId,
+				groupMemberUserId,
+			);
+
+		const removeMemberBody =
+			(await removeMemberResponse.json()) as
+				GroupConversationResponse;
+
+		if (!removeMemberResponse.ok) {
+			throw new Error(
+				`Le retrait du membre a échoué ` +
+				`(${removeMemberResponse.status}) : ` +
+				(removeMemberBody.error ??
+					JSON.stringify(removeMemberBody)),
+			);
+		}
+
+		const memberRemovedForOwner =
+			await memberRemovedForOwnerPromise;
+
+		const memberRemovedForRemainingMember =
+			await memberRemovedForRemainingMemberPromise;
+
+		const removedMemberDeleted =
+			await removedMemberDeletedPromise;
+
+		if (
+			memberRemovedForOwner.id !== groupConversationId ||
+			memberRemovedForRemainingMember.id !==
+				groupConversationId ||
+			removedMemberDeleted.conversationId !==
+				groupConversationId
+		) {
+			throw new Error(
+				"Les événements de retrait contiennent un mauvais identifiant.",
+			);
+		}
+
+		const removedMemberCount = Number.parseInt(
+			runSql(`
+SELECT COUNT(*)
+FROM "ConversationParticipant"
+WHERE "conversationId" = ${groupConversationId}
+AND "userId" = ${groupMemberUserId};
+`),
+			10,
+		);
+
+		if (removedMemberCount !== 0) {
+			throw new Error(
+				"Le membre retiré est encore présent en base.",
+			);
+		}
+
+		const forbiddenJoinAfterRemoval =
+			await emitWithAck(
+				groupMemberSocket,
+				"joinConversation",
+				groupConversationId,
+			);
+
+		if (forbiddenJoinAfterRemoval.success) {
+			throw new Error(
+				"Le membre retiré peut encore rejoindre le groupe.",
+			);
+		}
+
+		console.log(
+			"Tests d'ajout et de retrait d'un membre réussis.",
+		);
 
 		const receivedMessagePromise =
 			waitForNewMessage(receiverSocket);
@@ -1683,12 +2277,24 @@ async function main(): Promise<void> {
 			presenceSocket1.disconnect();
 		}
 
+		if (groupMemberSocket) {
+			groupMemberSocket.disconnect();
+		}
+
 		if (receiverSocket) {
 			receiverSocket.disconnect();
 		}
 
 		if (socket) {
 			socket.disconnect();
+		}
+
+		if (groupConversationId !== null) {
+			deleteTestConversation(groupConversationId);
+
+			console.log(
+				`Groupe temporaire ${groupConversationId} supprimé.`,
+			);
 		}
 
 		if (conversationId !== null) {
