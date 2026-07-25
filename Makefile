@@ -253,4 +253,4 @@ fclean: clean
 	@rm -rf "$(BACKEND_DIR)/node_modules"
 	@rm -rf "$(FRONTEND_DIR)/node_modules"
 
-re: fclean setup dev
+re: fclean dev
