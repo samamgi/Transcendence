@@ -95,14 +95,14 @@ function getConversationName(
     return conversation.name ?? 'Unnamed group'
   }
 
-  const otherParticipant = conversation.participants.find(
+  const otherParticipant = conversation.participants?.find(
     (participant) =>
       participant.userId !== currentUserId,
   )
 
   return (
-    otherParticipant?.user.displayName ??
-    otherParticipant?.user.username ??
+    otherParticipant?.user?.displayName ??
+    otherParticipant?.user?.username ??
     'Private conversation'
   )
 }
@@ -111,14 +111,14 @@ function getTypingUserName(
   conversation: Conversation,
   userId: number,
 ): string {
-  const participant = conversation.participants.find(
+  const participant = conversation.participants?.find(
     (currentParticipant) =>
       currentParticipant.userId === userId,
   )
 
   return (
-    participant?.user.displayName ??
-    participant?.user.username ??
+    participant?.user?.displayName ??
+    participant?.user?.username ??
     'Someone'
   )
 }

@@ -702,7 +702,7 @@ function App() {
                 value={profileUsername}
                 minLength={3}
                 maxLength={20}
-                pattern="[A-Za-z0-9_-]+"
+               
                 required
                 onChange={(event) =>
                   setProfileUsername(event.target.value)
@@ -1005,7 +1005,7 @@ function App() {
                 value={username}
                 minLength={3}
                 maxLength={20}
-                pattern="[A-Za-z0-9_-]+"
+               
                 autoComplete="username"
                 required
                 onChange={(event) =>

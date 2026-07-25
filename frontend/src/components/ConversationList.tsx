@@ -17,14 +17,14 @@ export type Conversation = {
   type: 'PRIVATE' | 'GROUP'
   name: string | null
   ownerId: number | null
-  participants: ConversationParticipant[]
-  messages: Array<{
+  participants?: ConversationParticipant[]
+  messages?: Array<{
     id: number
     content: string
     createdAt: string
     senderId: number
   }>
-  unreadCount: number
+  unreadCount?: number
 }
 
 type ConversationsResponse = {
@@ -48,7 +48,7 @@ function getConversationName(
     return conversation.name ?? 'Unnamed group'
   }
 
-  const otherParticipant = conversation.participants.find(
+  const otherParticipant = conversation.participants?.find(
     (participant) => participant.userId !== currentUserId,
   )
 
@@ -57,8 +57,9 @@ function getConversationName(
   }
 
   return (
-    otherParticipant.user.displayName ??
-    otherParticipant.user.username
+    otherParticipant?.user?.displayName ??
+    otherParticipant?.user?.username ??
+    'Private conversation'
   )
 }
 
@@ -93,7 +94,16 @@ export default function ConversationList({
         }
 
         if (!cancelled) {
-          setConversations(payload.conversations ?? [])
+          setConversations(
+            (payload.conversations ?? []).map(
+              (conversation) => ({
+                ...conversation,
+                participants: conversation.participants ?? [],
+                messages: conversation.messages ?? [],
+                unreadCount: conversation.unreadCount ?? 0,
+              }),
+            ),
+          )
         }
       } catch (caughtError) {
         if (!cancelled) {
@@ -128,7 +138,7 @@ export default function ConversationList({
       ) : (
         <ul className="conversation-list">
           {conversations.map((conversation) => {
-            const lastMessage = conversation.messages[0]
+            const lastMessage = conversation.messages?.[0]
 
             return (
               <li key={conversation.id}>
@@ -154,7 +164,7 @@ export default function ConversationList({
                     )}
                   </span>
 
-                  {conversation.unreadCount > 0 && (
+                  {(conversation.unreadCount ?? 0) > 0 && (
                     <span className="unread-count">
                       {conversation.unreadCount}
                     </span>
