@@ -31,7 +31,7 @@ type RemovedReaction = {
   userId: number
 }
 
-type ChatMessage = {
+type ReplyMessage = {
   id: number
   conversationId: number
   senderId: number
@@ -39,7 +39,19 @@ type ChatMessage = {
   createdAt: string
   updatedAt: string
   sender: MessageUser
+}
+
+type ChatMessage = {
+  id: number
+  conversationId: number
+  senderId: number
+  content: string
+  replyToId: number | null
+  createdAt: string
+  updatedAt: string
+  sender: MessageUser
   reactions: MessageReaction[]
+  replyTo: ReplyMessage | null
 }
 
 type MessagesResponse = {
@@ -128,6 +140,8 @@ function normalizeMessage(
 ): ChatMessage {
   return {
     ...message,
+    replyToId: message.replyToId ?? null,
+    replyTo: message.replyTo ?? null,
     reactions: message.reactions ?? [],
   }
 }
@@ -144,8 +158,16 @@ export default function ChatWindow({
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [replyingTo, setReplyingTo] =
+    useState<ChatMessage | null>(null)
+
   const [typingUserIds, setTypingUserIds] =
     useState<Set<number>>(new Set())
+
+  const activeReplyingTo =
+    replyingTo?.conversationId === conversation.id
+      ? replyingTo
+      : null
   const [pendingReactionMessageIds, setPendingReactionMessageIds] =
     useState<Set<number>>(new Set())
 
@@ -565,6 +587,9 @@ export default function ChatWindow({
       {
         conversationId: conversation.id,
         content: trimmedContent,
+        ...(activeReplyingTo
+          ? { replyToId: activeReplyingTo.id }
+          : {}),
       },
       (response: SendMessageResponse) => {
         setSending(false)
@@ -578,6 +603,7 @@ export default function ChatWindow({
         }
 
         setContent('')
+        setReplyingTo(null)
         onMessageSent()
       },
     )
@@ -625,7 +651,26 @@ export default function ChatWindow({
                     message.sender.username}
                 </strong>
 
+                {message.replyTo && (
+                  <blockquote className="reply-reference">
+                    <strong>
+                      Replying to{' '}
+                      {message.replyTo.sender.displayName ??
+                        message.replyTo.sender.username}
+                    </strong>
+                    <p>{message.replyTo.content}</p>
+                  </blockquote>
+                )}
+
                 <p>{message.content}</p>
+
+                <button
+                  type="button"
+                  className="reply-button"
+                  onClick={() => setReplyingTo(message)}
+                >
+                  Reply
+                </button>
 
                 <div
                   className="message-reactions"
@@ -707,6 +752,25 @@ export default function ChatWindow({
         className="message-form"
         onSubmit={handleSubmit}
       >
+        {activeReplyingTo && (
+          <div className="reply-composer-preview">
+            <div>
+              <strong>
+                Replying to{' '}
+                {activeReplyingTo.sender.displayName ??
+                  activeReplyingTo.sender.username}
+              </strong>
+              <p>{activeReplyingTo.content}</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setReplyingTo(null)}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
         <label>
           Message
           <textarea
