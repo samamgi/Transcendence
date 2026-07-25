@@ -80,6 +80,14 @@ type GroupConversationResponse = {
 	error?: string;
 };
 
+type LeaveGroupConversationResponse = {
+	success?: boolean;
+	message?: string;
+	deleted?: boolean;
+	conversation?: GroupConversation | null;
+	error?: string;
+};
+
 type ConversationCreatedEvent = GroupConversation;
 
 type ConversationUpdatedEvent = GroupConversation;
@@ -247,6 +255,21 @@ async function removeGroupMemberHttp(
 ): Promise<Response> {
 	return fetch(
 		`${API_URL}/api/conversations/groups/${conversationId}/members/${memberId}`,
+		{
+			method: "DELETE",
+			headers: {
+				Cookie: cookie,
+			},
+		},
+	);
+}
+
+async function leaveGroupConversationHttp(
+	cookie: string,
+	conversationId: number,
+): Promise<Response> {
+	return fetch(
+		`${API_URL}/api/conversations/groups/${conversationId}/leave`,
 		{
 			method: "DELETE",
 			headers: {
@@ -942,6 +965,8 @@ async function connectSocket(cookie: string): Promise<Socket> {
 async function main(): Promise<void> {
 	let conversationId: number | null = null;
 	let groupConversationId: number | null = null;
+	let ownerLeaveGroupId: number | null = null;
+	let lastMemberGroupId: number | null = null;
 	let socket: Socket | null = null;
 	let receiverSocket: Socket | null = null;
 	let groupMemberSocket: Socket | null = null;
@@ -1508,6 +1533,521 @@ AND "userId" = ${groupMemberUserId};
 		console.log(
 			"Tests d'ajout et de retrait d'un membre réussis.",
 		);
+
+		/*
+		 * Un membre non propriétaire quitte volontairement
+		 * le groupe.
+		 */
+		const memberLeaveDeletedPromise =
+			waitForConversationDeleted(receiverSocket);
+
+		const memberLeaveUpdatedPromise =
+			waitForConversationUpdated(socket);
+
+		const memberLeaveResponse =
+			await leaveGroupConversationHttp(
+				presenceCookie,
+				groupConversationId,
+			);
+
+		const memberLeaveBody =
+			(await memberLeaveResponse.json()) as
+				LeaveGroupConversationResponse;
+
+		console.log(
+			"Sortie volontaire du membre :",
+			memberLeaveResponse.status,
+			memberLeaveBody,
+		);
+
+		if (
+			!memberLeaveResponse.ok ||
+			memberLeaveBody.deleted !== false ||
+			!memberLeaveBody.conversation
+		) {
+			throw new Error(
+				`La sortie volontaire du membre a échoué ` +
+				`(${memberLeaveResponse.status}) : ` +
+				(memberLeaveBody.error ??
+					JSON.stringify(memberLeaveBody)),
+			);
+		}
+
+		const memberLeaveDeleted =
+			await memberLeaveDeletedPromise;
+
+		const memberLeaveUpdated =
+			await memberLeaveUpdatedPromise;
+
+		if (
+			memberLeaveDeleted.conversationId !==
+				groupConversationId
+		) {
+			throw new Error(
+				"conversationDeleted contient un mauvais identifiant après la sortie du membre.",
+			);
+		}
+
+		if (
+			memberLeaveUpdated.id !==
+				groupConversationId
+		) {
+			throw new Error(
+				"conversationUpdated contient un mauvais groupe après la sortie du membre.",
+			);
+		}
+
+		if (
+			memberLeaveBody.conversation.participants?.some(
+				(participant) =>
+					participant.userId === presenceUserId,
+			) ||
+			memberLeaveUpdated.participants?.some(
+				(participant) =>
+					participant.userId === presenceUserId,
+			)
+		) {
+			throw new Error(
+				"Le membre ayant quitté le groupe figure encore parmi les participants.",
+			);
+		}
+
+		const memberAfterLeaveCount =
+			Number.parseInt(
+				runSql(`
+SELECT COUNT(*)
+FROM "ConversationParticipant"
+WHERE "conversationId" = ${groupConversationId}
+AND "userId" = ${presenceUserId};
+`),
+				10,
+			);
+
+		if (memberAfterLeaveCount !== 0) {
+			throw new Error(
+				"Le membre ayant quitté le groupe est encore présent en base.",
+			);
+		}
+
+		const secondLeaveResponse =
+			await leaveGroupConversationHttp(
+				presenceCookie,
+				groupConversationId,
+			);
+
+		const secondLeaveBody =
+			(await secondLeaveResponse.json()) as
+				LeaveGroupConversationResponse;
+
+		console.log(
+			"Seconde tentative de sortie :",
+			secondLeaveResponse.status,
+			secondLeaveBody,
+		);
+
+		if (
+			secondLeaveResponse.status !== 403 ||
+			secondLeaveResponse.ok
+		) {
+			throw new Error(
+				"Un utilisateur qui n'est plus membre a pu quitter le groupe une seconde fois.",
+			);
+		}
+
+		console.log(
+			"Test de sortie volontaire d'un membre réussi.",
+		);
+
+		/*
+		 * Le propriétaire quitte un groupe contenant encore
+		 * deux membres. La propriété doit être transférée.
+		 */
+		const ownerGroupCreatedForAlicePromise =
+			waitForConversationCreated(socket);
+
+		const ownerGroupCreatedForBobPromise =
+			waitForConversationCreated(receiverSocket);
+
+		const ownerGroupCreatedForCharliePromise =
+			waitForConversationCreated(groupMemberSocket);
+
+		const ownerGroupCreateResponse =
+			await createGroupConversationHttp(
+				cookie,
+				"Groupe transfert propriétaire",
+				[
+					presenceUserId,
+					groupMemberUserId,
+				],
+			);
+
+		const ownerGroupCreateBody =
+			(await ownerGroupCreateResponse.json()) as
+				GroupConversationResponse;
+
+		if (
+			!ownerGroupCreateResponse.ok ||
+			!ownerGroupCreateBody.conversation
+		) {
+			throw new Error(
+				`La création du groupe de transfert a échoué ` +
+				`(${ownerGroupCreateResponse.status}) : ` +
+				(ownerGroupCreateBody.error ??
+					JSON.stringify(ownerGroupCreateBody)),
+			);
+		}
+
+		ownerLeaveGroupId =
+			ownerGroupCreateBody.conversation.id;
+
+		const [
+			ownerGroupCreatedForAlice,
+			ownerGroupCreatedForBob,
+			ownerGroupCreatedForCharlie,
+		] = await Promise.all([
+			ownerGroupCreatedForAlicePromise,
+			ownerGroupCreatedForBobPromise,
+			ownerGroupCreatedForCharliePromise,
+		]);
+
+		if (
+			ownerGroupCreatedForAlice.id !== ownerLeaveGroupId ||
+			ownerGroupCreatedForBob.id !== ownerLeaveGroupId ||
+			ownerGroupCreatedForCharlie.id !== ownerLeaveGroupId
+		) {
+			throw new Error(
+				"conversationCreated contient un mauvais identifiant pour le groupe de transfert.",
+			);
+		}
+
+		const formerOwnerDeletedPromise =
+			waitForConversationDeleted(socket);
+
+		const ownerUpdatedForBobPromise =
+			waitForConversationUpdated(receiverSocket);
+
+		const ownerUpdatedForCharliePromise =
+			waitForConversationUpdated(groupMemberSocket);
+
+		const ownerLeaveResponse =
+			await leaveGroupConversationHttp(
+				cookie,
+				ownerLeaveGroupId,
+			);
+
+		const ownerLeaveBody =
+			(await ownerLeaveResponse.json()) as
+				LeaveGroupConversationResponse;
+
+		console.log(
+			"Sortie volontaire du propriétaire :",
+			ownerLeaveResponse.status,
+			ownerLeaveBody,
+		);
+
+		if (
+			!ownerLeaveResponse.ok ||
+			ownerLeaveBody.deleted !== false ||
+			!ownerLeaveBody.conversation
+		) {
+			throw new Error(
+				`La sortie du propriétaire a échoué ` +
+				`(${ownerLeaveResponse.status}) : ` +
+				(ownerLeaveBody.error ??
+					JSON.stringify(ownerLeaveBody)),
+			);
+		}
+
+		const [
+			formerOwnerDeleted,
+			ownerUpdatedForBob,
+			ownerUpdatedForCharlie,
+		] = await Promise.all([
+			formerOwnerDeletedPromise,
+			ownerUpdatedForBobPromise,
+			ownerUpdatedForCharliePromise,
+		]);
+
+		if (
+			formerOwnerDeleted.conversationId !==
+				ownerLeaveGroupId ||
+			ownerUpdatedForBob.id !== ownerLeaveGroupId ||
+			ownerUpdatedForCharlie.id !== ownerLeaveGroupId
+		) {
+			throw new Error(
+				"Les événements de transfert de propriété contiennent un mauvais identifiant.",
+			);
+		}
+
+		const expectedNewOwnerId = Math.min(
+			presenceUserId,
+			groupMemberUserId,
+		);
+
+		if (
+			ownerLeaveBody.conversation.ownerId !==
+				expectedNewOwnerId ||
+			ownerUpdatedForBob.ownerId !==
+				expectedNewOwnerId ||
+			ownerUpdatedForCharlie.ownerId !==
+				expectedNewOwnerId
+		) {
+			throw new Error(
+				`Mauvais transfert de propriété : ` +
+				`propriétaire attendu ${expectedNewOwnerId}.`,
+			);
+		}
+
+		if (
+			ownerLeaveBody.conversation.participants?.some(
+				(participant) =>
+					participant.userId === userId,
+			)
+		) {
+			throw new Error(
+				"L'ancien propriétaire figure encore parmi les participants.",
+			);
+		}
+
+		const ownerIdInDatabase = Number.parseInt(
+			runSql(`
+SELECT "ownerId"
+FROM "Conversation"
+WHERE "id" = ${ownerLeaveGroupId};
+`),
+			10,
+		);
+
+		if (ownerIdInDatabase !== expectedNewOwnerId) {
+			throw new Error(
+				`La base contient le propriétaire ${ownerIdInDatabase} ` +
+				`au lieu de ${expectedNewOwnerId}.`,
+			);
+		}
+
+		const formerOwnerParticipantCount =
+			Number.parseInt(
+				runSql(`
+SELECT COUNT(*)
+FROM "ConversationParticipant"
+WHERE "conversationId" = ${ownerLeaveGroupId}
+AND "userId" = ${userId};
+`),
+				10,
+			);
+
+		if (formerOwnerParticipantCount !== 0) {
+			throw new Error(
+				"L'ancien propriétaire est encore participant en base.",
+			);
+		}
+
+		console.log(
+			"Test de transfert automatique de propriété réussi :",
+			expectedNewOwnerId,
+		);
+
+		/*
+		 * Le dernier membre quitte le groupe :
+		 * la conversation doit être supprimée.
+		 */
+		const lastGroupCreatedForAlicePromise =
+			waitForConversationCreated(socket);
+
+		const lastGroupCreatedForBobPromise =
+			waitForConversationCreated(receiverSocket);
+
+		const lastGroupCreateResponse =
+			await createGroupConversationHttp(
+				cookie,
+				"Groupe dernier membre",
+				[presenceUserId],
+			);
+
+		const lastGroupCreateBody =
+			(await lastGroupCreateResponse.json()) as
+				GroupConversationResponse;
+
+		if (
+			!lastGroupCreateResponse.ok ||
+			!lastGroupCreateBody.conversation
+		) {
+			throw new Error(
+				`La création du groupe du dernier membre a échoué ` +
+				`(${lastGroupCreateResponse.status}) : ` +
+				(lastGroupCreateBody.error ??
+					JSON.stringify(lastGroupCreateBody)),
+			);
+		}
+
+		lastMemberGroupId =
+			lastGroupCreateBody.conversation.id;
+
+		const [
+			lastGroupCreatedForAlice,
+			lastGroupCreatedForBob,
+		] = await Promise.all([
+			lastGroupCreatedForAlicePromise,
+			lastGroupCreatedForBobPromise,
+		]);
+
+		if (
+			lastGroupCreatedForAlice.id !== lastMemberGroupId ||
+			lastGroupCreatedForBob.id !== lastMemberGroupId
+		) {
+			throw new Error(
+				"conversationCreated contient un mauvais identifiant pour le groupe du dernier membre.",
+			);
+		}
+
+		/*
+		 * Bob quitte d'abord. Alice reste seule et redevient
+		 * automatiquement propriétaire.
+		 */
+		const bobDeletedFromLastGroupPromise =
+			waitForConversationDeleted(receiverSocket);
+
+		const lastGroupUpdatedForAlicePromise =
+			waitForConversationUpdated(socket);
+
+		const bobLeaveLastGroupResponse =
+			await leaveGroupConversationHttp(
+				presenceCookie,
+				lastMemberGroupId,
+			);
+
+		const bobLeaveLastGroupBody =
+			(await bobLeaveLastGroupResponse.json()) as
+				LeaveGroupConversationResponse;
+
+		if (
+			!bobLeaveLastGroupResponse.ok ||
+			bobLeaveLastGroupBody.deleted !== false ||
+			!bobLeaveLastGroupBody.conversation
+		) {
+			throw new Error(
+				`Le départ de l'avant-dernier membre a échoué ` +
+				`(${bobLeaveLastGroupResponse.status}) : ` +
+				(bobLeaveLastGroupBody.error ??
+					JSON.stringify(bobLeaveLastGroupBody)),
+			);
+		}
+
+		const [
+			bobDeletedFromLastGroup,
+			lastGroupUpdatedForAlice,
+		] = await Promise.all([
+			bobDeletedFromLastGroupPromise,
+			lastGroupUpdatedForAlicePromise,
+		]);
+
+		if (
+			bobDeletedFromLastGroup.conversationId !==
+				lastMemberGroupId ||
+			lastGroupUpdatedForAlice.id !==
+				lastMemberGroupId
+		) {
+			throw new Error(
+				"Les événements du départ de l'avant-dernier membre contiennent un mauvais identifiant.",
+			);
+		}
+
+		if (
+			lastGroupUpdatedForAlice.ownerId !== userId ||
+			lastGroupUpdatedForAlice.participants?.length !== 1 ||
+			lastGroupUpdatedForAlice.participants?.[0]?.userId !==
+				userId
+		) {
+			throw new Error(
+				"Le groupe ne contient pas uniquement le dernier membre attendu.",
+			);
+		}
+
+		/*
+		 * Alice est maintenant seule. Sa sortie doit supprimer
+		 * définitivement la conversation.
+		 */
+		const lastMemberDeletedPromise =
+			waitForConversationDeleted(socket);
+
+		const lastMemberLeaveResponse =
+			await leaveGroupConversationHttp(
+				cookie,
+				lastMemberGroupId,
+			);
+
+		const lastMemberLeaveBody =
+			(await lastMemberLeaveResponse.json()) as
+				LeaveGroupConversationResponse;
+
+		console.log(
+			"Sortie du dernier membre :",
+			lastMemberLeaveResponse.status,
+			lastMemberLeaveBody,
+		);
+
+		if (
+			!lastMemberLeaveResponse.ok ||
+			lastMemberLeaveBody.deleted !== true ||
+			lastMemberLeaveBody.conversation !== null
+		) {
+			throw new Error(
+				`La suppression du groupe vide a échoué ` +
+				`(${lastMemberLeaveResponse.status}) : ` +
+				(lastMemberLeaveBody.error ??
+					JSON.stringify(lastMemberLeaveBody)),
+			);
+		}
+
+		const lastMemberDeleted =
+			await lastMemberDeletedPromise;
+
+		if (
+			lastMemberDeleted.conversationId !==
+				lastMemberGroupId
+		) {
+			throw new Error(
+				"conversationDeleted contient un mauvais identifiant après le départ du dernier membre.",
+			);
+		}
+
+		const deletedConversationCount =
+			Number.parseInt(
+				runSql(`
+SELECT COUNT(*)
+FROM "Conversation"
+WHERE "id" = ${lastMemberGroupId};
+`),
+				10,
+			);
+
+		if (deletedConversationCount !== 0) {
+			throw new Error(
+				"Le groupe du dernier membre existe encore en base.",
+			);
+		}
+
+		const deletedParticipantsCount =
+			Number.parseInt(
+				runSql(`
+SELECT COUNT(*)
+FROM "ConversationParticipant"
+WHERE "conversationId" = ${lastMemberGroupId};
+`),
+				10,
+			);
+
+		if (deletedParticipantsCount !== 0) {
+			throw new Error(
+				"Des participants du groupe supprimé existent encore en base.",
+			);
+		}
+
+		console.log(
+			"Test de suppression après le départ du dernier membre réussi.",
+		);
+
+		lastMemberGroupId = null;
 
 		const receivedMessagePromise =
 			waitForNewMessage(receiverSocket);
@@ -2287,6 +2827,22 @@ AND "userId" = ${groupMemberUserId};
 
 		if (socket) {
 			socket.disconnect();
+		}
+
+		if (lastMemberGroupId !== null) {
+			deleteTestConversation(lastMemberGroupId);
+
+			console.log(
+				`Groupe du dernier membre ${lastMemberGroupId} supprimé.`,
+			);
+		}
+
+		if (ownerLeaveGroupId !== null) {
+			deleteTestConversation(ownerLeaveGroupId);
+
+			console.log(
+				`Groupe de transfert ${ownerLeaveGroupId} supprimé.`,
+			);
 		}
 
 		if (groupConversationId !== null) {
