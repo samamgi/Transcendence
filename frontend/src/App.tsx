@@ -266,13 +266,28 @@ function App() {
               <img
                 className="avatar"
                 src={user.avatarUrl}
-                alt={`${user.username}'s avatar`}
+                alt=""
+                onError={(event) => {
+                  event.currentTarget.hidden = true
+
+                  const fallback =
+                    event.currentTarget
+                      .nextElementSibling as HTMLElement | null
+
+                  if (fallback) {
+                    fallback.hidden = false
+                  }
+                }}
               />
-            ) : (
-              <div className="avatar avatar-placeholder">
-                {user.username.charAt(0).toUpperCase()}
-              </div>
-            )}
+            ) : null}
+
+            <div
+              className="avatar avatar-placeholder"
+              hidden={Boolean(user.avatarUrl)}
+              aria-label={`${user.username}'s avatar`}
+            >
+              {user.username.charAt(0).toUpperCase()}
+            </div>
 
             <div>
               <h1>Transcendence</h1>
