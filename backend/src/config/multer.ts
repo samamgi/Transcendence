@@ -1,11 +1,18 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
 import multer from "multer";
 import { HttpError } from "../lib/http-error.js";
 
+const avatarDirectory = path.resolve("uploads/avatars");
+
+fs.mkdirSync(avatarDirectory, {
+	recursive: true,
+});
+
 const storage = multer.diskStorage({
 	destination(_request, _file, callback) {
-		callback(null, "uploads/avatars");
+		callback(null, avatarDirectory);
 	},
 
 	filename(_request, file, callback) {
