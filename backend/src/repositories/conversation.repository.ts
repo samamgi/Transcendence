@@ -113,6 +113,66 @@ export class ConversationRepository {
 		});
 	}
 
+	async findGroupForMembership(
+		conversationId: number,
+	) {
+		return prisma.conversation.findFirst({
+			where: {
+				id: conversationId,
+				type: "GROUP",
+			},
+			select: {
+				id: true,
+				ownerId: true,
+				participants: {
+					select: {
+						userId: true,
+					},
+				},
+			},
+		});
+	}
+
+	async addGroupMember(
+		conversationId: number,
+		userId: number,
+	) {
+		await prisma.conversationParticipant.create({
+			data: {
+				conversationId,
+				userId,
+			},
+		});
+
+		return prisma.conversation.findUniqueOrThrow({
+			where: {
+				id: conversationId,
+			},
+			include: {
+				owner: {
+					select: {
+						id: true,
+						username: true,
+						displayName: true,
+						avatarUrl: true,
+					},
+				},
+				participants: {
+					include: {
+						user: {
+							select: {
+								id: true,
+								username: true,
+								displayName: true,
+								avatarUrl: true,
+							},
+						},
+					},
+				},
+			},
+		});
+	}
+
 	async updateGroupName(
 		conversationId: number,
 		name: string,

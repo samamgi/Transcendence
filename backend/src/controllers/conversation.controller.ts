@@ -81,6 +81,58 @@ export class ConversationController {
 		});
 	}
 
+	async addGroupMember(
+		request: Request,
+		response: Response,
+	): Promise<void> {
+		const ownerId = request.session.userId;
+
+		if (ownerId === undefined) {
+			response.status(401).json({
+				error: "Authentication required",
+			});
+			return;
+		}
+
+		const conversationId = Number(
+			request.params.conversationId,
+		);
+
+		const memberId = request.body.memberId;
+
+		const conversation =
+			await conversationService.addGroupMember(
+				ownerId,
+				conversationId,
+				memberId,
+			);
+
+		for (const participant of conversation.participants) {
+			if (participant.userId === memberId) {
+				continue;
+			}
+
+			getIO()
+				.to(`user:${participant.userId}`)
+				.emit(
+					"conversationUpdated",
+					conversation,
+				);
+		}
+
+		getIO()
+			.to(`user:${memberId}`)
+			.emit(
+				"conversationCreated",
+				conversation,
+			);
+
+		response.status(200).json({
+			message: "Member added to group",
+			conversation,
+		});
+	}
+
 	async renameGroupConversation(
 		request: Request,
 		response: Response,

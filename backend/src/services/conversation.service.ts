@@ -180,6 +180,98 @@ export class ConversationService {
 		);
 	}
 
+	async addGroupMember(
+		ownerId: number,
+		conversationId: number,
+		memberId: unknown,
+	) {
+		if (
+			!Number.isInteger(conversationId) ||
+			conversationId <= 0
+		) {
+			throw new HttpError(
+				400,
+				"Invalid conversation ID",
+			);
+		}
+
+		if (
+			typeof memberId !== "number" ||
+			!Number.isInteger(memberId) ||
+			memberId <= 0
+		) {
+			throw new HttpError(
+				400,
+				"Member ID must be a positive integer",
+			);
+		}
+
+		const conversation =
+			await conversationRepository.findGroupForMembership(
+				conversationId,
+			);
+
+		if (!conversation) {
+			throw new HttpError(
+				404,
+				"Group conversation not found",
+			);
+		}
+
+		if (conversation.ownerId !== ownerId) {
+			throw new HttpError(
+				403,
+				"Only the group owner can add members",
+			);
+		}
+
+		if (
+			conversation.participants.some(
+				(participant) =>
+					participant.userId === memberId,
+			)
+		) {
+			throw new HttpError(
+				409,
+				"User is already a group member",
+			);
+		}
+
+		if (conversation.participants.length >= 50) {
+			throw new HttpError(
+				400,
+				"Group cannot exceed 50 participants",
+			);
+		}
+
+		const user = await userRepository.findById(memberId);
+
+		if (!user) {
+			throw new HttpError(
+				404,
+				"User not found",
+			);
+		}
+
+		const isBlocked =
+			await blockRepository.isBlockedBetween(
+				ownerId,
+				memberId,
+			);
+
+		if (isBlocked) {
+			throw new HttpError(
+				403,
+				"You cannot add a blocked user to the group",
+			);
+		}
+
+		return conversationRepository.addGroupMember(
+			conversationId,
+			memberId,
+		);
+	}
+
 	async renameGroupConversation(
 		userId: number,
 		conversationId: number,

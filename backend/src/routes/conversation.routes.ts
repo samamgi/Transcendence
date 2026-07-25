@@ -26,6 +26,16 @@ router.post(
 	),
 );
 
+router.post(
+	"/groups/:conversationId/members",
+	requireAuth,
+	asyncHandler(
+		conversationController.addGroupMember.bind(
+			conversationController,
+		),
+	),
+);
+
 router.patch(
 	"/groups/:conversationId/name",
 	requireAuth,
