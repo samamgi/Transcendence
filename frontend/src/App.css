@@ -130,3 +130,49 @@ small {
 .avatar[hidden] {
   display: none;
 }
+
+.social-section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.search-form {
+  margin-top: 1rem;
+}
+
+.user-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.user-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.4rem;
+}
+
+.user-list span {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.user-list small {
+  display: block;
+}
+
+.user-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.user-actions button {
+  min-height: auto;
+}

@@ -20,6 +20,30 @@ type ApiResponse = {
   error?: string
 }
 
+type SearchUser = {
+  id: number
+  username: string
+  displayName: string | null
+  avatarUrl: string | null
+  relationship:
+    | 'NONE'
+    | 'PENDING_SENT'
+    | 'PENDING_RECEIVED'
+    | 'FRIEND'
+}
+
+type Friend = {
+  id: number
+  username: string
+  displayName: string | null
+  avatarUrl: string | null
+}
+
+type FriendRequest = {
+  id: number
+  sender: Friend
+}
+
 type AuthMode = 'login' | 'register'
 
 async function requestJson(
@@ -50,6 +74,34 @@ async function requestJson(
   return payload
 }
 
+async function loadFriends() {
+  const response = await requestJson('/api/friends')
+
+  return response as {
+    friends: Friend[]
+  }
+}
+
+async function loadRequests() {
+  const response = await requestJson(
+    '/api/friends/requests',
+  )
+
+  return response as {
+    requests: FriendRequest[]
+  }
+}
+
+async function searchUsers(query: string) {
+  const response = await requestJson(
+    `/api/users/search?query=${encodeURIComponent(query)}`,
+  )
+
+  return response as {
+    users: SearchUser[]
+  }
+}
+
 function App() {
   const [user, setUser] = useState<User | null>(null)
   const [mode, setMode] = useState<AuthMode>('login')
@@ -70,10 +122,31 @@ function App() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] =
+    useState<SearchUser[]>([])
+
+  const [friends, setFriends] =
+    useState<Friend[]>([])
+
+  const [friendRequests, setFriendRequests] =
+    useState<FriendRequest[]>([])
+
   function applyUser(nextUser: User): void {
     setUser(nextUser)
     setProfileUsername(nextUser.username)
     setDisplayName(nextUser.displayName ?? '')
+  }
+
+  async function refreshFriendsData(): Promise<void> {
+    const [loadedFriends, loadedRequests] =
+      await Promise.all([
+        loadFriends(),
+        loadRequests(),
+      ])
+
+    setFriends(loadedFriends.friends)
+    setFriendRequests(loadedRequests.requests)
   }
 
   useEffect(() => {
@@ -86,6 +159,20 @@ function App() {
         }
 
         applyUser(payload.user)
+
+        const loadedFriends =
+          await loadFriends()
+
+        setFriends(
+          loadedFriends.friends,
+        )
+
+        const loadedRequests =
+          await loadRequests()
+
+        setFriendRequests(
+          loadedRequests.requests,
+        )
       } catch {
         setUser(null)
       } finally {
@@ -120,6 +207,7 @@ function App() {
       }
 
       applyUser(payload.user)
+      await refreshFriendsData()
       setPassword('')
     } catch (caughtError) {
       setError(
@@ -215,6 +303,148 @@ function App() {
     }
   }
 
+  async function handleUserSearch(
+    event: FormEvent<HTMLFormElement>,
+  ): Promise<void> {
+    event.preventDefault()
+    setError('')
+    setSuccess('')
+
+    const query = searchQuery.trim()
+
+    if (query.length < 2) {
+      setError('Search must contain at least 2 characters')
+      return
+    }
+
+    try {
+      const payload = await searchUsers(query)
+      setSearchResults(payload.users)
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'User search failed',
+      )
+    }
+  }
+
+  async function handleSendFriendRequest(
+    userId: number,
+  ): Promise<void> {
+    setError('')
+    setSuccess('')
+
+    try {
+      await requestJson(`/api/friends/requests/${userId}`, {
+        method: 'POST',
+      })
+
+      setSearchResults((currentResults) =>
+        currentResults.map((result) =>
+          result.id === userId
+            ? {
+                ...result,
+                relationship: 'PENDING_SENT',
+              }
+            : result,
+        ),
+      )
+
+      setSuccess('Friend request sent')
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Friend request failed',
+      )
+    }
+  }
+
+  async function handleAcceptFriendRequest(
+    requestId: number,
+  ): Promise<void> {
+    setError('')
+    setSuccess('')
+
+    try {
+      await requestJson(
+        `/api/friends/requests/${requestId}/accept`,
+        {
+          method: 'POST',
+        },
+      )
+
+      await refreshFriendsData()
+      setSuccess('Friend request accepted')
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Unable to accept friend request',
+      )
+    }
+  }
+
+  async function handleDeclineFriendRequest(
+    requestId: number,
+  ): Promise<void> {
+    setError('')
+    setSuccess('')
+
+    try {
+      await requestJson(
+        `/api/friends/requests/${requestId}/decline`,
+        {
+          method: 'POST',
+        },
+      )
+
+      await refreshFriendsData()
+      setSuccess('Friend request declined')
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Unable to decline friend request',
+      )
+    }
+  }
+
+  async function handleRemoveFriend(
+    friendId: number,
+  ): Promise<void> {
+    setError('')
+    setSuccess('')
+
+    try {
+      await requestJson(`/api/friends/${friendId}`, {
+        method: 'DELETE',
+      })
+
+      await refreshFriendsData()
+
+      setSearchResults((currentResults) =>
+        currentResults.map((result) =>
+          result.id === friendId
+            ? {
+                ...result,
+                relationship: 'NONE',
+              }
+            : result,
+        ),
+      )
+
+      setSuccess('Friend removed')
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Unable to remove friend',
+      )
+    }
+  }
+
   async function handleLogout(): Promise<void> {
     setError('')
     setSuccess('')
@@ -227,6 +457,10 @@ function App() {
       setUser(null)
       setPassword('')
       setAvatarFile(null)
+      setSearchQuery('')
+      setSearchResults([])
+      setFriends([])
+      setFriendRequests([])
     } catch (caughtError) {
       setError(
         caughtError instanceof Error
@@ -352,6 +586,166 @@ function App() {
               {avatarSubmitting ? 'Uploading...' : 'Upload avatar'}
             </button>
           </form>
+
+          <section className="social-section">
+            <h2>Search users</h2>
+
+            <form
+              className="search-form"
+              onSubmit={(event) =>
+                void handleUserSearch(event)
+              }
+            >
+              <label>
+                Username or display name
+                <input
+                  type="search"
+                  value={searchQuery}
+                  minLength={2}
+                  required
+                  onChange={(event) =>
+                    setSearchQuery(event.target.value)
+                  }
+                />
+              </label>
+
+              <button type="submit">Search</button>
+            </form>
+
+            {searchResults.length > 0 && (
+              <ul className="user-list">
+                {searchResults.map((result) => (
+                  <li key={result.id}>
+                    <span>
+                      <strong>
+                        {result.displayName ??
+                          result.username}
+                      </strong>
+                      {result.displayName && (
+                        <small>@{result.username}</small>
+                      )}
+                    </span>
+
+                    {result.relationship === 'NONE' && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void handleSendFriendRequest(
+                            result.id,
+                          )
+                        }
+                      >
+                        Add
+                      </button>
+                    )}
+
+                    {result.relationship ===
+                      'PENDING_SENT' && (
+                      <button type="button" disabled>
+                        Request sent
+                      </button>
+                    )}
+
+                    {result.relationship ===
+                      'PENDING_RECEIVED' && (
+                      <button type="button" disabled>
+                        Request received
+                      </button>
+                    )}
+
+                    {result.relationship === 'FRIEND' && (
+                      <button type="button" disabled>
+                        Friend
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="social-section">
+            <h2>Friend requests</h2>
+
+            {friendRequests.length === 0 ? (
+              <p>No pending friend requests.</p>
+            ) : (
+              <ul className="user-list">
+                {friendRequests.map((request) => (
+                  <li key={request.id}>
+                    <span>
+                      <strong>
+                        {request.sender.displayName ??
+                          request.sender.username}
+                      </strong>
+                      {request.sender.displayName && (
+                        <small>
+                          @{request.sender.username}
+                        </small>
+                      )}
+                    </span>
+
+                    <div className="user-actions">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void handleAcceptFriendRequest(
+                            request.id,
+                          )
+                        }
+                      >
+                        Accept
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void handleDeclineFriendRequest(
+                            request.id,
+                          )
+                        }
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="social-section">
+            <h2>Friends</h2>
+
+            {friends.length === 0 ? (
+              <p>No friends yet.</p>
+            ) : (
+              <ul className="user-list">
+                {friends.map((friend) => (
+                  <li key={friend.id}>
+                    <span>
+                      <strong>
+                        {friend.displayName ??
+                          friend.username}
+                      </strong>
+                      {friend.displayName && (
+                        <small>@{friend.username}</small>
+                      )}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void handleRemoveFriend(friend.id)
+                      }
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
 
           {error && <p className="message error">{error}</p>}
           {success && <p className="message success">{success}</p>}
