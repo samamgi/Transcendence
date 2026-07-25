@@ -8,6 +8,7 @@ export class ConversationRepository {
 		const conversations =
 			await prisma.conversation.findMany({
 				where: {
+					type: "PRIVATE",
 					participants: {
 						every: {
 							userId: {
@@ -33,6 +34,7 @@ export class ConversationRepository {
 	) {
 		return prisma.conversation.create({
 			data: {
+				type: "PRIVATE",
 				participants: {
 					create: [
 						{
@@ -46,6 +48,52 @@ export class ConversationRepository {
 			},
 			include: {
 				participants: true,
+			},
+		});
+	}
+
+	async createGroupConversation(
+		ownerId: number,
+		name: string,
+		memberIds: number[],
+	) {
+		return prisma.conversation.create({
+			data: {
+				type: "GROUP",
+				name,
+				ownerId,
+				participants: {
+					create: [
+						{
+							userId: ownerId,
+						},
+						...memberIds.map((userId) => ({
+							userId,
+						})),
+					],
+				},
+			},
+			include: {
+				owner: {
+					select: {
+						id: true,
+						username: true,
+						displayName: true,
+						avatarUrl: true,
+					},
+				},
+				participants: {
+					include: {
+						user: {
+							select: {
+								id: true,
+								username: true,
+								displayName: true,
+								avatarUrl: true,
+							},
+						},
+					},
+				},
 			},
 		});
 	}

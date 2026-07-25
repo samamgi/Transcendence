@@ -73,6 +73,113 @@ export class ConversationService {
 		};
 	}
 
+	async createGroupConversation(
+		ownerId: number,
+		name: unknown,
+		memberIds: unknown,
+	) {
+		if (typeof name !== "string") {
+			throw new HttpError(
+				400,
+				"Group name is required",
+			);
+		}
+
+		const trimmedName = name.trim();
+
+		if (trimmedName.length === 0) {
+			throw new HttpError(
+				400,
+				"Group name cannot be empty",
+			);
+		}
+
+		if (trimmedName.length > 100) {
+			throw new HttpError(
+				400,
+				"Group name cannot exceed 100 characters",
+			);
+		}
+
+		if (!Array.isArray(memberIds)) {
+			throw new HttpError(
+				400,
+				"Group members must be an array",
+			);
+		}
+
+		if (
+			!memberIds.every(
+				(memberId) =>
+					Number.isInteger(memberId) &&
+					memberId > 0,
+			)
+		) {
+			throw new HttpError(
+				400,
+				"Invalid group member id",
+			);
+		}
+
+		const uniqueMemberIds = [
+			...new Set<number>(
+				memberIds.filter(
+					(memberId): memberId is number =>
+						memberId !== ownerId,
+				),
+			),
+		];
+
+		if (uniqueMemberIds.length === 0) {
+			throw new HttpError(
+				400,
+				"A group must contain at least one other member",
+			);
+		}
+
+		if (uniqueMemberIds.length > 49) {
+			throw new HttpError(
+				400,
+				"A group cannot contain more than 50 members",
+			);
+		}
+
+		const users = await Promise.all(
+			uniqueMemberIds.map((memberId) =>
+				userRepository.findById(memberId),
+			),
+		);
+
+		if (users.some((user) => user === null)) {
+			throw new HttpError(
+				404,
+				"One or more users were not found",
+			);
+		}
+
+		const blockStatuses = await Promise.all(
+			uniqueMemberIds.map((memberId) =>
+				blockRepository.isBlockedBetween(
+					ownerId,
+					memberId,
+				),
+			),
+		);
+
+		if (blockStatuses.some(Boolean)) {
+			throw new HttpError(
+				403,
+				"You cannot add a blocked user to the group",
+			);
+		}
+
+		return conversationRepository.createGroupConversation(
+			ownerId,
+			trimmedName,
+			uniqueMemberIds,
+		);
+	}
+
 	async getUserConversations(userId: number) {
 		const conversations =
 			await conversationRepository.findUserConversations(userId);
