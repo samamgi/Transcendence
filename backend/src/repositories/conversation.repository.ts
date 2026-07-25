@@ -133,6 +133,46 @@ export class ConversationRepository {
 		});
 	}
 
+	async removeGroupMember(
+		conversationId: number,
+		userId: number,
+	) {
+		await prisma.conversationParticipant.deleteMany({
+			where: {
+				conversationId,
+				userId,
+			},
+		});
+
+		return prisma.conversation.findUniqueOrThrow({
+			where: {
+				id: conversationId,
+			},
+			include: {
+				owner: {
+					select: {
+						id: true,
+						username: true,
+						displayName: true,
+						avatarUrl: true,
+					},
+				},
+				participants: {
+					include: {
+						user: {
+							select: {
+								id: true,
+								username: true,
+								displayName: true,
+								avatarUrl: true,
+							},
+						},
+					},
+				},
+			},
+		});
+	}
+
 	async addGroupMember(
 		conversationId: number,
 		userId: number,

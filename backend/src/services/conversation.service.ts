@@ -180,6 +180,75 @@ export class ConversationService {
 		);
 	}
 
+	async removeGroupMember(
+		ownerId: number,
+		conversationId: number,
+		memberId: number,
+	) {
+		if (
+			!Number.isInteger(conversationId) ||
+			conversationId <= 0
+		) {
+			throw new HttpError(
+				400,
+				"Invalid conversation ID",
+			);
+		}
+
+		if (
+			!Number.isInteger(memberId) ||
+			memberId <= 0
+		) {
+			throw new HttpError(
+				400,
+				"Invalid member ID",
+			);
+		}
+
+		const conversation =
+			await conversationRepository.findGroupForMembership(
+				conversationId,
+			);
+
+		if (!conversation) {
+			throw new HttpError(
+				404,
+				"Group conversation not found",
+			);
+		}
+
+		if (conversation.ownerId !== ownerId) {
+			throw new HttpError(
+				403,
+				"Only the group owner can remove members",
+			);
+		}
+
+		if (memberId === ownerId) {
+			throw new HttpError(
+				400,
+				"The group owner cannot remove themselves",
+			);
+		}
+
+		const isMember = conversation.participants.some(
+			(participant) =>
+				participant.userId === memberId,
+		);
+
+		if (!isMember) {
+			throw new HttpError(
+				404,
+				"User is not a member of this group",
+			);
+		}
+
+		return conversationRepository.removeGroupMember(
+			conversationId,
+			memberId,
+		);
+	}
+
 	async addGroupMember(
 		ownerId: number,
 		conversationId: number,

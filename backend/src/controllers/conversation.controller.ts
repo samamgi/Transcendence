@@ -81,6 +81,58 @@ export class ConversationController {
 		});
 	}
 
+	async removeGroupMember(
+		request: Request,
+		response: Response,
+	): Promise<void> {
+		const ownerId = request.session.userId;
+
+		if (ownerId === undefined) {
+			response.status(401).json({
+				error: "Authentication required",
+			});
+			return;
+		}
+
+		const conversationId = Number(
+			request.params.conversationId,
+		);
+
+		const memberId = Number(
+			request.params.memberId,
+		);
+
+		const conversation =
+			await conversationService.removeGroupMember(
+				ownerId,
+				conversationId,
+				memberId,
+			);
+
+		for (const participant of conversation.participants) {
+			getIO()
+				.to(`user:${participant.userId}`)
+				.emit(
+					"conversationUpdated",
+					conversation,
+				);
+		}
+
+		getIO()
+			.to(`user:${memberId}`)
+			.emit(
+				"conversationDeleted",
+				{
+					conversationId,
+				},
+			);
+
+		response.status(200).json({
+			message: "Member removed from group",
+			conversation,
+		});
+	}
+
 	async addGroupMember(
 		request: Request,
 		response: Response,
