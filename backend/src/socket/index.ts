@@ -3,6 +3,7 @@ import type { Session, SessionData } from "express-session";
 import { Server } from "socket.io";
 import { sessionMiddleware } from "../config/session.js";
 import { conversationService } from "../services/conversation.service.js";
+import { friendService } from "../services/friend.service.js";
 
 type SessionRequest = {
 	session: Session &
@@ -91,6 +92,12 @@ type ReactionResponse = {
 type TypingEvent = {
 	conversationId: number;
 	userId: number;
+};
+
+type GetOnlineFriendsResponse = {
+	success: boolean;
+	userIds?: number[];
+	error?: string;
 };
 
 let io: Server | undefined;
@@ -191,6 +198,39 @@ export function initializeSocket(
 				userId,
 			});
 		}
+
+		socket.on(
+			"getOnlineFriends",
+			async (
+				callback?: (
+					response: GetOnlineFriendsResponse,
+				) => void,
+			) => {
+				try {
+					const friends =
+						await friendService.getFriends(userId);
+
+					const userIds = friends
+						.filter((friend) =>
+							connectedUsers.has(friend.id),
+						)
+						.map((friend) => friend.id);
+
+					callback?.({
+						success: true,
+						userIds,
+					});
+				} catch (error) {
+					callback?.({
+						success: false,
+						error:
+							error instanceof Error
+								? error.message
+								: "Unable to get online friends",
+					});
+				}
+			},
+		);
 
 		socket.on(
 			"joinConversation",

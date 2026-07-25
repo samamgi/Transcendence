@@ -1,9 +1,15 @@
 import {
   useEffect,
+  useRef,
   useState,
   type ChangeEvent,
   type FormEvent,
 } from 'react'
+import { io, type Socket } from 'socket.io-client'
+import ChatWindow from './components/ChatWindow'
+import ConversationList, {
+  type Conversation,
+} from './components/ConversationList'
 import './App.css'
 
 type User = {
@@ -42,6 +48,21 @@ type Friend = {
 type FriendRequest = {
   id: number
   sender: Friend
+}
+
+type OnlineFriendsResponse = {
+  success: boolean
+  userIds?: number[]
+  error?: string
+}
+
+type PresenceEvent = {
+  userId: number
+}
+
+type ConversationResponse = {
+  conversation?: Conversation
+  error?: string
 }
 
 type AuthMode = 'login' | 'register'
@@ -132,10 +153,45 @@ function App() {
   const [friendRequests, setFriendRequests] =
     useState<FriendRequest[]>([])
 
+  const [onlineFriendIds, setOnlineFriendIds] =
+    useState<Set<number>>(new Set())
+
+  const socketRef = useRef<Socket | null>(null)
+
+  const [socket, setSocket] =
+    useState<Socket | null>(null)
+
+  const [selectedConversation, setSelectedConversation] =
+    useState<Conversation | null>(null)
+
+  const [conversationRefreshKey, setConversationRefreshKey] =
+    useState(0)
+
   function applyUser(nextUser: User): void {
     setUser(nextUser)
     setProfileUsername(nextUser.username)
     setDisplayName(nextUser.displayName ?? '')
+  }
+
+  function refreshOnlineFriends(): void {
+    const socket = socketRef.current
+
+    if (!socket?.connected) {
+      return
+    }
+
+    socket.emit(
+      'getOnlineFriends',
+      (response: OnlineFriendsResponse) => {
+        if (!response.success) {
+          return
+        }
+
+        setOnlineFriendIds(
+          new Set(response.userIds ?? []),
+        )
+      },
+    )
   }
 
   async function refreshFriendsData(): Promise<void> {
@@ -147,6 +203,7 @@ function App() {
 
     setFriends(loadedFriends.friends)
     setFriendRequests(loadedRequests.requests)
+    refreshOnlineFriends()
   }
 
   useEffect(() => {
@@ -182,6 +239,68 @@ function App() {
 
     void restoreSession()
   }, [])
+
+  useEffect(() => {
+    if (!user) {
+      return
+    }
+
+    const activeSocket = io({
+      withCredentials: true,
+    })
+
+    socketRef.current = activeSocket
+
+    const handleConnect = (): void => {
+      setSocket(activeSocket)
+      refreshOnlineFriends()
+    }
+
+    const handleDisconnect = (): void => {
+      setSocket((currentSocket) =>
+        currentSocket === activeSocket
+          ? null
+          : currentSocket,
+      )
+    }
+
+    const handleOnline = (
+      event: PresenceEvent,
+    ): void => {
+      setOnlineFriendIds((currentIds) => {
+        const nextIds = new Set(currentIds)
+        nextIds.add(event.userId)
+        return nextIds
+      })
+    }
+
+    const handleOffline = (
+      event: PresenceEvent,
+    ): void => {
+      setOnlineFriendIds((currentIds) => {
+        const nextIds = new Set(currentIds)
+        nextIds.delete(event.userId)
+        return nextIds
+      })
+    }
+
+    activeSocket.on('connect', handleConnect)
+    activeSocket.on('disconnect', handleDisconnect)
+    activeSocket.on('userOnline', handleOnline)
+    activeSocket.on('userOffline', handleOffline)
+
+    return () => {
+      activeSocket.off('connect', handleConnect)
+      activeSocket.off('disconnect', handleDisconnect)
+      activeSocket.off('userOnline', handleOnline)
+      activeSocket.off('userOffline', handleOffline)
+      activeSocket.disconnect()
+
+      if (socketRef.current === activeSocket) {
+        socketRef.current = null
+      }
+    }
+  }, [user])
 
   async function handleAuthentication(
     event: FormEvent<HTMLFormElement>,
@@ -411,6 +530,44 @@ function App() {
     }
   }
 
+  async function handleOpenConversation(
+    friendId: number,
+  ): Promise<void> {
+    setError('')
+    setSuccess('')
+
+    try {
+      const response = await fetch('/api/conversations', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: friendId,
+        }),
+      })
+
+      const payload =
+        (await response.json()) as ConversationResponse
+
+      if (!response.ok || !payload.conversation) {
+        throw new Error(
+          payload.error ?? 'Unable to open conversation',
+        )
+      }
+
+      setSelectedConversation(payload.conversation)
+      setConversationRefreshKey((currentKey) => currentKey + 1)
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Unable to open conversation',
+      )
+    }
+  }
+
   async function handleRemoveFriend(
     friendId: number,
   ): Promise<void> {
@@ -461,6 +618,9 @@ function App() {
       setSearchResults([])
       setFriends([])
       setFriendRequests([])
+      setOnlineFriendIds(new Set())
+      setSelectedConversation(null)
+      setConversationRefreshKey(0)
     } catch (caughtError) {
       setError(
         caughtError instanceof Error
@@ -731,21 +891,68 @@ function App() {
                       {friend.displayName && (
                         <small>@{friend.username}</small>
                       )}
+
+                      <small
+                        className={
+                          onlineFriendIds.has(friend.id)
+                            ? 'online-status'
+                            : 'offline-status'
+                        }
+                      >
+                        {onlineFriendIds.has(friend.id)
+                          ? 'Online'
+                          : 'Offline'}
+                      </small>
                     </span>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void handleRemoveFriend(friend.id)
-                      }
-                    >
-                      Remove
-                    </button>
+                    <div className="user-actions">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void handleOpenConversation(friend.id)
+                        }
+                      >
+                        Message
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void handleRemoveFriend(friend.id)
+                        }
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
             )}
           </section>
+
+          <ConversationList
+            currentUserId={user.id}
+            selectedConversationId={
+              selectedConversation?.id ?? null
+            }
+            refreshKey={conversationRefreshKey}
+            onSelect={setSelectedConversation}
+            onError={setError}
+          />
+
+          {selectedConversation && (
+            <ChatWindow
+              conversation={selectedConversation}
+              currentUserId={user.id}
+              socket={socket}
+              onError={setError}
+              onMessageSent={() =>
+                setConversationRefreshKey(
+                  (currentKey) => currentKey + 1,
+                )
+              }
+            />
+          )}
 
           {error && <p className="message error">{error}</p>}
           {success && <p className="message success">{success}</p>}
