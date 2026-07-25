@@ -64,6 +64,57 @@ type MessageUpdatedEvent = {
 	updatedAt: string;
 };
 
+
+type MessageDeletedEvent = {
+	id: number;
+	conversationId: number;
+};
+
+function waitForMessageDeleted(
+	socket: Socket,
+): Promise<MessageDeletedEvent> {
+	return new Promise((resolve, reject) => {
+		const timeout = setTimeout(() => {
+			socket.off(
+				"messageDeleted",
+				onMessageDeleted,
+			);
+			reject(
+				new Error(
+					"Aucun événement messageDeleted reçu dans les 5 secondes.",
+				),
+			);
+		}, 5000);
+
+		function onMessageDeleted(
+			payload: MessageDeletedEvent,
+		): void {
+			clearTimeout(timeout);
+			resolve(payload);
+		}
+
+		socket.once(
+			"messageDeleted",
+			onMessageDeleted,
+		);
+	});
+}
+
+async function deleteMessageHttp(
+	cookie: string,
+	messageId: number,
+): Promise<Response> {
+	return fetch(
+		`${API_URL}/api/conversations/messages/${messageId}`,
+		{
+			method: "DELETE",
+			headers: {
+				Cookie: cookie,
+			},
+		},
+	);
+}
+
 function waitForMessageUpdated(
 	socket: Socket,
 ): Promise<MessageUpdatedEvent> {
@@ -978,6 +1029,101 @@ async function main(): Promise<void> {
 		if (forbiddenUpdateResponse.status !== 403) {
 			throw new Error(
 				`La modification par un autre utilisateur devait retourner 403, reçu ${forbiddenUpdateResponse.status}.`,
+			);
+		}
+
+		const forbiddenDeleteResponse =
+			await deleteMessageHttp(
+				presenceCookie,
+				sendResponse.message.id,
+			);
+
+		console.log(
+			"Suppression interdite par un autre utilisateur :",
+			forbiddenDeleteResponse.status,
+		);
+
+		if (forbiddenDeleteResponse.status !== 403) {
+			throw new Error(
+				`La suppression par un autre utilisateur devait retourner 403, reçu ${forbiddenDeleteResponse.status}.`,
+			);
+		}
+
+		const deletedMessagePromiseAlice =
+			waitForMessageDeleted(socket);
+
+		const deletedMessagePromiseBob =
+			waitForMessageDeleted(receiverSocket);
+
+		const deleteMessageResponse =
+			await deleteMessageHttp(
+				cookie,
+				sendResponse.message.id,
+			);
+
+		if (!deleteMessageResponse.ok) {
+			throw new Error(
+				`DELETE /messages a échoué (${deleteMessageResponse.status})`,
+			);
+		}
+
+		const deletedMessageAlice =
+			await deletedMessagePromiseAlice;
+
+		const deletedMessageBob =
+			await deletedMessagePromiseBob;
+
+		console.log(
+			"Événement messageDeleted reçu :",
+			deletedMessageAlice,
+			deletedMessageBob,
+		);
+
+		if (
+			deletedMessageAlice.id !==
+				sendResponse.message.id ||
+			deletedMessageBob.id !==
+				sendResponse.message.id ||
+			deletedMessageAlice.conversationId !==
+				conversationId ||
+			deletedMessageBob.conversationId !==
+				conversationId
+		) {
+			throw new Error(
+				"Le contenu de messageDeleted est invalide.",
+			);
+		}
+
+		const historyAfterDelete =
+			await emitWithAck(
+				socket,
+				"getMessages",
+				{
+					conversationId,
+					limit: 50,
+				},
+			);
+
+		console.log(
+			"Historique après suppression :",
+			historyAfterDelete,
+		);
+
+		if (!historyAfterDelete.success) {
+			throw new Error(
+				"Impossible de récupérer l'historique après suppression.",
+			);
+		}
+
+		const deletedMessageStillExists =
+			historyAfterDelete.messages?.some(
+				(message) =>
+					message.id === sendResponse.message!.id,
+			);
+
+		if (deletedMessageStillExists) {
+			throw new Error(
+				"Le message supprimé est toujours présent dans l'historique.",
 			);
 		}
 

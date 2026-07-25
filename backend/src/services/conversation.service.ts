@@ -241,6 +241,44 @@ export class ConversationService {
 		);
 	}
 
+	async deleteMessage(
+		messageId: number,
+		userId: number,
+	) {
+		if (
+			!Number.isInteger(messageId) ||
+			messageId <= 0
+		) {
+			throw new HttpError(
+				400,
+				"Invalid message id",
+			);
+		}
+
+		const message =
+			await conversationRepository.findMessageById(
+				messageId,
+			);
+
+		if (!message) {
+			throw new HttpError(
+				404,
+				"Message not found",
+			);
+		}
+
+		if (message.senderId !== userId) {
+			throw new HttpError(
+				403,
+				"You can only delete your own messages",
+			);
+		}
+
+		return conversationRepository.deleteMessage(
+			messageId,
+		);
+	}
+
 	async getMessages(
 		conversationId: number,
 		userId: number,

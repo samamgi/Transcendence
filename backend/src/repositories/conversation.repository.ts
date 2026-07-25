@@ -227,6 +227,16 @@ export class ConversationRepository {
 		});
 	}
 
+	async deleteMessage(
+		messageId: number,
+	) {
+		return prisma.message.delete({
+			where: {
+				id: messageId,
+			},
+		});
+	}
+
 	async findMessages(
 		conversationId: number,
 		limit: number,

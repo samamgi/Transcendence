@@ -176,6 +176,44 @@ export class ConversationController {
 		});
 	}
 
+	async deleteMessage(
+		request: Request,
+		response: Response,
+	): Promise<void> {
+		const userId = request.session.userId;
+
+		if (userId === undefined) {
+			response.status(401).json({
+				error: "Authentication required",
+			});
+			return;
+		}
+
+		const messageId = Number(
+			request.params.messageId,
+		);
+
+		const message =
+			await conversationService.deleteMessage(
+				messageId,
+				userId,
+			);
+
+		getIO()
+			.to(
+				`conversation:${message.conversationId}`,
+			)
+			.emit("messageDeleted", {
+				id: message.id,
+				conversationId:
+					message.conversationId,
+			});
+
+		response.status(200).json({
+			message: "Message deleted",
+		});
+	}
+
 	async getMessages(
 		request: Request,
 		response: Response,
