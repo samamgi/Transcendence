@@ -23,6 +23,23 @@ const GROUP_TEST_USER = {
 	password: "CharlieTest123!",
 };
 
+type SearchUser = {
+	id: number;
+	username: string;
+	displayName: string | null;
+	avatarUrl: string | null;
+	relationship:
+		| "NONE"
+		| "FRIEND"
+		| "PENDING_SENT"
+		| "PENDING_RECEIVED";
+};
+
+type SearchUsersResponse = {
+	users?: SearchUser[];
+	error?: string;
+};
+
 type SocketMessage = {
 	id: number;
 	conversationId: number;
@@ -126,6 +143,24 @@ type RemovedReaction = {
 	conversationId: number;
 	userId: number;
 };
+
+async function searchUsersHttp(
+	cookie: string,
+	query: string,
+): Promise<Response> {
+	const searchParams = new URLSearchParams({
+		query,
+	});
+
+	return fetch(
+		`${API_URL}/api/users/search?${searchParams.toString()}`,
+		{
+			headers: {
+				Cookie: cookie,
+			},
+		},
+	);
+}
 
 function waitForConversationCreated(
 	socket: Socket,
@@ -996,6 +1031,211 @@ async function main(): Promise<void> {
 		console.log(
 			`Utilisateur authentifié : ${TEST_USER.username} ` +
 				`(id ${userId})`,
+		);
+
+		const extractSearchUsers = (
+			payload: unknown,
+		): SearchUser[] => {
+			if (Array.isArray(payload)) {
+				return payload as SearchUser[];
+			}
+
+			if (
+				typeof payload === "object" &&
+				payload !== null &&
+				"users" in payload &&
+				Array.isArray(
+					(payload as SearchUsersResponse).users,
+				)
+			) {
+				return (
+					(payload as SearchUsersResponse).users ?? []
+				);
+			}
+
+			throw new Error(
+				"Format inattendu pour la recherche d'utilisateurs.",
+			);
+		};
+
+		const validSearchResponse =
+			await searchUsersHttp(
+				cookie,
+				PRESENCE_TEST_USER.username,
+			);
+
+		if (validSearchResponse.status !== 200) {
+			throw new Error(
+				`La recherche valide a retourné ` +
+					`${validSearchResponse.status} au lieu de 200.`,
+			);
+		}
+
+		const validSearchUsers = extractSearchUsers(
+			await validSearchResponse.json(),
+		);
+
+		const searchedUser = validSearchUsers.find(
+			(user) => user.id === presenceUserId,
+		);
+
+		if (!searchedUser) {
+			throw new Error(
+				"L'utilisateur recherché n'apparaît pas dans les résultats.",
+			);
+		}
+
+		if (
+			searchedUser.username !==
+			PRESENCE_TEST_USER.username
+		) {
+			throw new Error(
+				"Le username retourné par la recherche est invalide.",
+			);
+		}
+
+		const requiredSearchFields = [
+			"id",
+			"username",
+			"displayName",
+			"avatarUrl",
+			"relationship",
+		] as const;
+
+		for (const field of requiredSearchFields) {
+			if (!(field in searchedUser)) {
+				throw new Error(
+					`Le champ ${field} manque dans le résultat de recherche.`,
+				);
+			}
+		}
+
+		const allowedRelationships = new Set([
+			"NONE",
+			"FRIEND",
+			"PENDING_SENT",
+			"PENDING_RECEIVED",
+		]);
+
+		if (
+			!allowedRelationships.has(
+				searchedUser.relationship,
+			)
+		) {
+			throw new Error(
+				`Relation de recherche invalide : ` +
+					`${searchedUser.relationship}.`,
+			);
+		}
+
+		console.log(
+			"Recherche utilisateur valide :",
+			searchedUser,
+		);
+
+		const uppercaseSearchResponse =
+			await searchUsersHttp(
+				cookie,
+				PRESENCE_TEST_USER.username.toUpperCase(),
+			);
+
+		if (uppercaseSearchResponse.status !== 200) {
+			throw new Error(
+				"La recherche insensible à la casse a échoué.",
+			);
+		}
+
+		const uppercaseSearchUsers = extractSearchUsers(
+			await uppercaseSearchResponse.json(),
+		);
+
+		if (
+			!uppercaseSearchUsers.some(
+				(user) => user.id === presenceUserId,
+			)
+		) {
+			throw new Error(
+				"La recherche n'est pas insensible à la casse.",
+			);
+		}
+
+		console.log(
+			"Recherche insensible à la casse réussie.",
+		);
+
+		const selfSearchResponse =
+			await searchUsersHttp(
+				cookie,
+				TEST_USER.username,
+			);
+
+		if (selfSearchResponse.status !== 200) {
+			throw new Error(
+				"La recherche de son propre username a échoué.",
+			);
+		}
+
+		const selfSearchUsers = extractSearchUsers(
+			await selfSearchResponse.json(),
+		);
+
+		if (
+			selfSearchUsers.some(
+				(user) => user.id === userId,
+			)
+		) {
+			throw new Error(
+				"L'utilisateur connecté apparaît dans sa propre recherche.",
+			);
+		}
+
+		console.log(
+			"L'utilisateur connecté est correctement exclu.",
+		);
+
+		const shortSearchResponse =
+			await searchUsersHttp(cookie, "a");
+
+		if (shortSearchResponse.status !== 400) {
+			throw new Error(
+				`Une recherche trop courte a retourné ` +
+					`${shortSearchResponse.status} au lieu de 400.`,
+			);
+		}
+
+		console.log(
+			"Recherche trop courte correctement refusée :",
+			shortSearchResponse.status,
+		);
+
+		const emptySearchResponse =
+			await searchUsersHttp(
+				cookie,
+				"utilisateur_inexistant_987654321",
+			);
+
+		if (emptySearchResponse.status !== 200) {
+			throw new Error(
+				"La recherche sans résultat a échoué.",
+			);
+		}
+
+		const emptySearchUsers = extractSearchUsers(
+			await emptySearchResponse.json(),
+		);
+
+		if (emptySearchUsers.length !== 0) {
+			throw new Error(
+				"La recherche inexistante devrait retourner un tableau vide.",
+			);
+		}
+
+		console.log(
+			"Recherche sans résultat correctement gérée.",
+		);
+
+		console.log(
+			"Tests de recherche d'utilisateurs réussis.",
 		);
 
 		conversationId = createTestConversation(userId, presenceUserId);
