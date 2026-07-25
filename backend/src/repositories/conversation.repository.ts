@@ -182,12 +182,16 @@ export class ConversationRepository {
 		conversationId: number,
 		senderId: number,
 		content: string,
+		replyToId?: number,
 	) {
 		return prisma.message.create({
 			data: {
 				conversationId,
 				senderId,
 				content,
+				...(replyToId !== undefined
+					? { replyToId }
+					: {}),
 			},
 			include: {
 				sender: {
@@ -196,6 +200,24 @@ export class ConversationRepository {
 						username: true,
 						displayName: true,
 						avatarUrl: true,
+					},
+				},
+				replyTo: {
+					select: {
+						id: true,
+						conversationId: true,
+						senderId: true,
+						content: true,
+						createdAt: true,
+						updatedAt: true,
+						sender: {
+							select: {
+								id: true,
+								username: true,
+								displayName: true,
+								avatarUrl: true,
+							},
+						},
 					},
 				},
 			},
@@ -266,6 +288,39 @@ export class ConversationRepository {
 						avatarUrl: true,
 					},
 				},
+				reactions: {
+					include: {
+						user: {
+							select: {
+								id: true,
+								username: true,
+								displayName: true,
+								avatarUrl: true,
+							},
+						},
+					},
+					orderBy: {
+						createdAt: "asc",
+					},
+				},
+				replyTo: {
+					select: {
+						id: true,
+						conversationId: true,
+						senderId: true,
+						content: true,
+						createdAt: true,
+						updatedAt: true,
+						sender: {
+							select: {
+								id: true,
+								username: true,
+								displayName: true,
+								avatarUrl: true,
+							},
+						},
+					},
+				},
 			},
 		});
 	}
@@ -294,6 +349,67 @@ export class ConversationRepository {
 			},
 			data: {
 				lastReadMessageId: messageId,
+			},
+		});
+	}
+
+	async findReaction(
+		messageId: number,
+		userId: number,
+	) {
+		return prisma.messageReaction.findUnique({
+			where: {
+				messageId_userId: {
+					messageId,
+					userId,
+				},
+			},
+		});
+	}
+
+	async upsertReaction(
+		messageId: number,
+		userId: number,
+		emoji: string,
+	) {
+		return prisma.messageReaction.upsert({
+			where: {
+				messageId_userId: {
+					messageId,
+					userId,
+				},
+			},
+			update: {
+				emoji,
+			},
+			create: {
+				messageId,
+				userId,
+				emoji,
+			},
+			include: {
+				user: {
+					select: {
+						id: true,
+						username: true,
+						displayName: true,
+						avatarUrl: true,
+					},
+				},
+			},
+		});
+	}
+
+	async deleteReaction(
+		messageId: number,
+		userId: number,
+	) {
+		return prisma.messageReaction.delete({
+			where: {
+				messageId_userId: {
+					messageId,
+					userId,
+				},
 			},
 		});
 	}

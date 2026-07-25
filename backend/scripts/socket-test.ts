@@ -70,6 +70,85 @@ type MessageDeletedEvent = {
 	conversationId: number;
 };
 
+type MessageReaction = {
+	messageId: number;
+	conversationId: number;
+	userId: number;
+	emoji: string;
+	user: {
+		id: number;
+		username: string;
+		displayName: string | null;
+		avatarUrl: string | null;
+	};
+};
+
+type RemovedReaction = {
+	messageId: number;
+	conversationId: number;
+	userId: number;
+};
+
+function waitForMessageReactionAdded(
+	socket: Socket,
+): Promise<MessageReaction> {
+	return new Promise((resolve, reject) => {
+		const timeout = setTimeout(() => {
+			socket.off(
+				"messageReactionAdded",
+				onReaction,
+			);
+			reject(
+				new Error(
+					"Aucun événement messageReactionAdded reçu dans les 5 secondes.",
+				),
+			);
+		}, 5000);
+
+		function onReaction(
+			payload: MessageReaction,
+		): void {
+			clearTimeout(timeout);
+			resolve(payload);
+		}
+
+		socket.once(
+			"messageReactionAdded",
+			onReaction,
+		);
+	});
+}
+
+function waitForMessageReactionRemoved(
+	socket: Socket,
+): Promise<RemovedReaction> {
+	return new Promise((resolve, reject) => {
+		const timeout = setTimeout(() => {
+			socket.off(
+				"messageReactionRemoved",
+				onReaction,
+			);
+			reject(
+				new Error(
+					"Aucun événement messageReactionRemoved reçu dans les 5 secondes.",
+				),
+			);
+		}, 5000);
+
+		function onReaction(
+			payload: RemovedReaction,
+		): void {
+			clearTimeout(timeout);
+			resolve(payload);
+		}
+
+		socket.once(
+			"messageReactionRemoved",
+			onReaction,
+		);
+	});
+}
+
 function waitForMessageDeleted(
 	socket: Socket,
 ): Promise<MessageDeletedEvent> {
@@ -1031,6 +1110,271 @@ async function main(): Promise<void> {
 				`La modification par un autre utilisateur devait retourner 403, reçu ${forbiddenUpdateResponse.status}.`,
 			);
 		}
+
+		const replyResponse =
+			await emitWithAck(
+				receiverSocket,
+				"sendMessage",
+				{
+					conversationId,
+					content:
+						"Réponse au message initial",
+					replyToId:
+						sendResponse.message.id,
+				},
+			);
+
+		console.log(
+			"Réponse à un message :",
+			replyResponse,
+		);
+
+		if (
+			!replyResponse.success ||
+			!replyResponse.message
+		) {
+			throw new Error(
+				"Impossible d'envoyer une réponse à un message.",
+			);
+		}
+
+		if (
+			replyResponse.message.replyToId !==
+				sendResponse.message.id ||
+			replyResponse.message.replyTo?.id !==
+				sendResponse.message.id ||
+			replyResponse.message.replyTo?.content !==
+				"Message modifié"
+		) {
+			throw new Error(
+				"Les informations du message cité sont invalides.",
+			);
+		}
+
+		const replyHistory =
+			await emitWithAck(
+				socket,
+				"getMessages",
+				{
+					conversationId,
+					limit: 50,
+				},
+			);
+
+		console.log(
+			"Historique avec réponse :",
+			replyHistory,
+		);
+
+		if (!replyHistory.success) {
+			throw new Error(
+				"Impossible de récupérer l'historique avec la réponse.",
+			);
+		}
+
+		const replyInHistory =
+			replyHistory.messages?.find(
+				(message) =>
+					message.id ===
+					replyResponse.message!.id,
+			);
+
+		if (
+			!replyInHistory ||
+			replyInHistory.replyTo?.id !==
+				sendResponse.message.id
+		) {
+			throw new Error(
+				"La réponse ou son message cité est absent de l'historique.",
+			);
+		}
+
+		const reactionAddedPromise =
+			waitForMessageReactionAdded(
+				receiverSocket,
+			);
+
+		const addReactionResponse =
+			await emitWithAck(
+				socket,
+				"message:addReaction",
+				{
+					messageId:
+						sendResponse.message.id,
+					emoji: "👍",
+				},
+			);
+
+		const reactionAdded =
+			await reactionAddedPromise;
+
+		console.log(
+			"Réaction ajoutée :",
+			addReactionResponse,
+			reactionAdded,
+		);
+
+		if (
+			!addReactionResponse.success ||
+			!addReactionResponse.reaction ||
+			addReactionResponse.reaction.messageId !==
+				sendResponse.message.id ||
+			addReactionResponse.reaction.emoji !== "👍" ||
+			reactionAdded.messageId !==
+				sendResponse.message.id ||
+			reactionAdded.conversationId !==
+				conversationId ||
+			reactionAdded.emoji !== "👍"
+		) {
+			throw new Error(
+				"La réaction 👍 n'a pas été correctement ajoutée.",
+			);
+		}
+
+		const firstReactionId =
+			addReactionResponse.reaction.id;
+
+		const reactionUpdatedPromise =
+			waitForMessageReactionAdded(
+				receiverSocket,
+			);
+
+		const updateReactionResponse =
+			await emitWithAck(
+				socket,
+				"message:addReaction",
+				{
+					messageId:
+						sendResponse.message.id,
+					emoji: "❤️",
+				},
+			);
+
+		const reactionUpdated =
+			await reactionUpdatedPromise;
+
+		console.log(
+			"Réaction remplacée :",
+			updateReactionResponse,
+			reactionUpdated,
+		);
+
+		if (
+			!updateReactionResponse.success ||
+			!updateReactionResponse.reaction ||
+			updateReactionResponse.reaction.id !==
+				firstReactionId ||
+			updateReactionResponse.reaction.emoji !==
+				"❤️" ||
+			reactionUpdated.emoji !== "❤️"
+		) {
+			throw new Error(
+				"La réaction n'a pas été remplacée par ❤️.",
+			);
+		}
+
+		const reactionHistory =
+			await emitWithAck(
+				socket,
+				"getMessages",
+				{
+					conversationId,
+					limit: 50,
+				},
+			);
+
+		console.log(
+			"Historique avec réaction :",
+			reactionHistory,
+		);
+
+		const reactedMessage =
+			reactionHistory.messages?.find(
+				(message) =>
+					message.id ===
+					sendResponse.message!.id,
+			);
+
+		if (
+			!reactionHistory.success ||
+			!reactedMessage ||
+			reactedMessage.reactions?.length !== 1 ||
+			reactedMessage.reactions[0]?.emoji !== "❤️"
+		) {
+			throw new Error(
+				"La réaction ❤️ est absente ou invalide dans l'historique.",
+			);
+		}
+
+		const reactionRemovedPromise =
+			waitForMessageReactionRemoved(
+				receiverSocket,
+			);
+
+		const removeReactionResponse =
+			await emitWithAck(
+				socket,
+				"message:removeReaction",
+				{
+					messageId:
+						sendResponse.message.id,
+				},
+			);
+
+		const reactionRemoved =
+			await reactionRemovedPromise;
+
+		console.log(
+			"Réaction supprimée :",
+			removeReactionResponse,
+			reactionRemoved,
+		);
+
+		if (
+			!removeReactionResponse.success ||
+			!removeReactionResponse.removedReaction ||
+			removeReactionResponse.removedReaction.messageId !==
+				sendResponse.message.id ||
+			reactionRemoved.messageId !==
+				sendResponse.message.id ||
+			reactionRemoved.conversationId !==
+				conversationId
+		) {
+			throw new Error(
+				"La réaction n'a pas été correctement supprimée.",
+			);
+		}
+
+		const historyAfterReactionRemoval =
+			await emitWithAck(
+				socket,
+				"getMessages",
+				{
+					conversationId,
+					limit: 50,
+				},
+			);
+
+		const messageAfterReactionRemoval =
+			historyAfterReactionRemoval.messages?.find(
+				(message) =>
+					message.id ===
+					sendResponse.message!.id,
+			);
+
+		if (
+			!historyAfterReactionRemoval.success ||
+			!messageAfterReactionRemoval ||
+			messageAfterReactionRemoval.reactions?.length !== 0
+		) {
+			throw new Error(
+				"La réaction est toujours présente dans l'historique après sa suppression.",
+			);
+		}
+
+		console.log(
+			"Tests des réactions réussis.",
+		);
 
 		const forbiddenDeleteResponse =
 			await deleteMessageHttp(

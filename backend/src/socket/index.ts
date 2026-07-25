@@ -19,6 +19,7 @@ type JoinConversationResponse = {
 type SendMessagePayload = {
 	conversationId: number;
 	content: string;
+	replyToId?: number;
 };
 
 type SendMessageResponse = {
@@ -61,6 +62,30 @@ type MessageReadEvent = {
 	conversationId: number;
 	userId: number;
 	messageId: number;
+};
+
+type AddReactionPayload = {
+	messageId: number;
+	emoji: string;
+};
+
+type RemoveReactionPayload = {
+	messageId: number;
+};
+
+type ReactionResponse = {
+	success: boolean;
+	reaction?: Awaited<
+		ReturnType<
+			typeof conversationService.addMessageReaction
+		>
+	>;
+	removedReaction?: Awaited<
+		ReturnType<
+			typeof conversationService.removeMessageReaction
+		>
+	>;
+	error?: string;
 };
 
 type TypingEvent = {
@@ -248,6 +273,7 @@ export function initializeSocket(
 							payload?.conversationId,
 							userId,
 							payload?.content,
+							payload?.replyToId,
 						);
 
 					socket.nsp
@@ -305,6 +331,87 @@ export function initializeSocket(
 			},
 		);
 
+
+		socket.on(
+			"message:addReaction",
+			async (
+				payload: AddReactionPayload,
+				callback?: (
+					response: ReactionResponse,
+				) => void,
+			) => {
+				try {
+					const reaction =
+						await conversationService.addMessageReaction(
+							payload?.messageId,
+							userId,
+							payload?.emoji,
+						);
+
+					socket.nsp
+						.to(
+							`conversation:${reaction.conversationId}`,
+						)
+						.emit(
+							"messageReactionAdded",
+							reaction,
+						);
+
+					callback?.({
+						success: true,
+						reaction,
+					});
+				} catch (error) {
+					callback?.({
+						success: false,
+						error:
+							error instanceof Error
+								? error.message
+								: "Unable to add reaction",
+					});
+				}
+			},
+		);
+
+		socket.on(
+			"message:removeReaction",
+			async (
+				payload: RemoveReactionPayload,
+				callback?: (
+					response: ReactionResponse,
+				) => void,
+			) => {
+				try {
+					const removedReaction =
+						await conversationService.removeMessageReaction(
+							payload?.messageId,
+							userId,
+						);
+
+					socket.nsp
+						.to(
+							`conversation:${removedReaction.conversationId}`,
+						)
+						.emit(
+							"messageReactionRemoved",
+							removedReaction,
+						);
+
+					callback?.({
+						success: true,
+						removedReaction,
+					});
+				} catch (error) {
+					callback?.({
+						success: false,
+						error:
+							error instanceof Error
+								? error.message
+								: "Unable to remove reaction",
+					});
+				}
+			},
+		);
 
 		socket.on(
 			"conversation:read",

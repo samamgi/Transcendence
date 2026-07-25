@@ -99,6 +99,7 @@ export class ConversationService {
 		conversationId: number,
 		userId: number,
 		content: string,
+		replyToId?: number,
 	) {
 		if (
 			!Number.isInteger(conversationId) ||
@@ -130,6 +131,19 @@ export class ConversationService {
 			throw new HttpError(
 				400,
 				"Message content cannot exceed 2000 characters",
+			);
+		}
+
+		if (
+			replyToId !== undefined &&
+			(
+				!Number.isInteger(replyToId) ||
+				replyToId <= 0
+			)
+		) {
+			throw new HttpError(
+				400,
+				"Invalid reply message id",
 			);
 		}
 
@@ -184,10 +198,35 @@ export class ConversationService {
 			);
 		}
 
+		if (replyToId !== undefined) {
+			const replyToMessage =
+				await conversationRepository.findMessageById(
+					replyToId,
+				);
+
+			if (!replyToMessage) {
+				throw new HttpError(
+					404,
+					"Reply message not found",
+				);
+			}
+
+			if (
+				replyToMessage.conversationId !==
+				conversationId
+			) {
+				throw new HttpError(
+					400,
+					"Reply message does not belong to this conversation",
+				);
+			}
+		}
+
 		return conversationRepository.createMessage(
 			conversationId,
 			userId,
 			trimmedContent,
+			replyToId,
 		);
 	}
 
@@ -240,6 +279,147 @@ export class ConversationService {
 			trimmedContent,
 		);
 	}
+
+	async addMessageReaction(
+		messageId: number,
+		userId: number,
+		emoji: string,
+	) {
+		if (
+			!Number.isInteger(messageId) ||
+			messageId <= 0
+		) {
+			throw new HttpError(
+				400,
+				"Invalid message id",
+			);
+		}
+
+		if (typeof emoji !== "string") {
+			throw new HttpError(
+				400,
+				"Emoji is required",
+			);
+		}
+
+		const allowedEmojis = [
+			"👍",
+			"❤️",
+			"😂",
+			"😮",
+			"😢",
+			"😡",
+		];
+
+		if (!allowedEmojis.includes(emoji)) {
+			throw new HttpError(
+				400,
+				"Unsupported emoji",
+			);
+		}
+
+		const message =
+			await conversationRepository.findMessageById(
+				messageId,
+			);
+
+		if (!message) {
+			throw new HttpError(
+				404,
+				"Message not found",
+			);
+		}
+
+		const isParticipant =
+			await conversationRepository.isParticipant(
+				message.conversationId,
+				userId,
+			);
+
+		if (!isParticipant) {
+			throw new HttpError(
+				403,
+				"You are not a participant in this conversation",
+			);
+		}
+
+		const reaction =
+			await conversationRepository.upsertReaction(
+				messageId,
+				userId,
+				emoji,
+			);
+
+		return {
+			...reaction,
+			conversationId: message.conversationId,
+		};
+	}
+
+	async removeMessageReaction(
+		messageId: number,
+		userId: number,
+	) {
+		if (
+			!Number.isInteger(messageId) ||
+			messageId <= 0
+		) {
+			throw new HttpError(
+				400,
+				"Invalid message id",
+			);
+		}
+
+		const message =
+			await conversationRepository.findMessageById(
+				messageId,
+			);
+
+		if (!message) {
+			throw new HttpError(
+				404,
+				"Message not found",
+			);
+		}
+
+		const isParticipant =
+			await conversationRepository.isParticipant(
+				message.conversationId,
+				userId,
+			);
+
+		if (!isParticipant) {
+			throw new HttpError(
+				403,
+				"You are not a participant in this conversation",
+			);
+		}
+
+		const reaction =
+			await conversationRepository.findReaction(
+				messageId,
+				userId,
+			);
+
+		if (!reaction) {
+			throw new HttpError(
+				404,
+				"Reaction not found",
+			);
+		}
+
+		await conversationRepository.deleteReaction(
+			messageId,
+			userId,
+		);
+
+		return {
+			messageId,
+			conversationId: message.conversationId,
+			userId,
+		};
+	}
+
 
 	async deleteMessage(
 		messageId: number,
