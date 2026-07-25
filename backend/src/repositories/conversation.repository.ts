@@ -109,6 +109,14 @@ export class ConversationRepository {
 					},
 				},
 				include: {
+					owner: {
+						select: {
+							id: true,
+							username: true,
+							displayName: true,
+							avatarUrl: true,
+						},
+					},
 					participants: {
 						include: {
 							user: {

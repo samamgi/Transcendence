@@ -185,18 +185,37 @@ export class ConversationService {
 			await conversationRepository.findUserConversations(userId);
 
 		return conversations.map((conversation) => {
+			const commonData = {
+				id: conversation.id,
+				type: conversation.type,
+				createdAt: conversation.createdAt,
+				updatedAt: conversation.updatedAt,
+				lastMessage: conversation.messages[0] ?? null,
+				unreadCount: conversation.unreadCount,
+			};
+
+			if (conversation.type === "GROUP") {
+				return {
+					...commonData,
+					name: conversation.name,
+					owner: conversation.owner,
+					participants:
+						conversation.participants.map(
+							(participant) => participant.user,
+						),
+					participantCount:
+						conversation.participants.length,
+				};
+			}
+
 			const otherParticipant =
 				conversation.participants.find(
 					(participant) => participant.userId !== userId,
 				);
 
 			return {
-				id: conversation.id,
-				createdAt: conversation.createdAt,
-				updatedAt: conversation.updatedAt,
+				...commonData,
 				otherUser: otherParticipant?.user ?? null,
-				lastMessage: conversation.messages[0] ?? null,
-				unreadCount: conversation.unreadCount,
 			};
 		});
 	}
