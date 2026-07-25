@@ -26,6 +26,16 @@ router.post(
 	),
 );
 
+router.post(
+	"/groups",
+	requireAuth,
+	asyncHandler(
+		conversationController.createGroupConversation.bind(
+			conversationController,
+		),
+	),
+);
+
 router.delete(
 	"/messages/:messageId",
 	requireAuth,

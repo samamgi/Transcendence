@@ -46,6 +46,41 @@ export class ConversationController {
 			});
 	}
 
+	async createGroupConversation(
+		request: Request,
+		response: Response,
+	): Promise<void> {
+		const ownerId = request.session.userId;
+
+		if (ownerId === undefined) {
+			response.status(401).json({
+				error: "Authentication required",
+			});
+			return;
+		}
+
+		const conversation =
+			await conversationService.createGroupConversation(
+				ownerId,
+				request.body.name,
+				request.body.memberIds,
+			);
+
+		for (const participant of conversation.participants) {
+			getIO()
+				.to(`user:${participant.userId}`)
+				.emit(
+					"conversationCreated",
+					conversation,
+				);
+		}
+
+		response.status(201).json({
+			message: "Group conversation created",
+			conversation,
+		});
+	}
+
 	async getUserConversations(
 		request: Request,
 		response: Response,
