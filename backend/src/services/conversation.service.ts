@@ -180,6 +180,69 @@ export class ConversationService {
 		);
 	}
 
+	async renameGroupConversation(
+		userId: number,
+		conversationId: number,
+		name: unknown,
+	) {
+		if (
+			!Number.isInteger(conversationId) ||
+			conversationId <= 0
+		) {
+			throw new HttpError(
+				400,
+				"Invalid conversation ID",
+			);
+		}
+
+		if (typeof name !== "string") {
+			throw new HttpError(
+				400,
+				"Group name must be a string",
+			);
+		}
+
+		const trimmedName = name.trim();
+
+		if (trimmedName.length === 0) {
+			throw new HttpError(
+				400,
+				"Group name cannot be empty",
+			);
+		}
+
+		if (trimmedName.length > 100) {
+			throw new HttpError(
+				400,
+				"Group name cannot exceed 100 characters",
+			);
+		}
+
+		const conversation =
+			await conversationRepository.findGroupConversation(
+				conversationId,
+			);
+
+		if (!conversation) {
+			throw new HttpError(
+				404,
+				"Group conversation not found",
+			);
+		}
+
+		if (conversation.ownerId !== userId) {
+			throw new HttpError(
+				403,
+				"Only the group owner can rename it",
+			);
+		}
+
+		return conversationRepository.updateGroupName(
+			conversationId,
+			trimmedName,
+		);
+	}
+
 	async getUserConversations(userId: number) {
 		const conversations =
 			await conversationRepository.findUserConversations(userId);

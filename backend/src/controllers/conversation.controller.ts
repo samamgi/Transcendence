@@ -81,6 +81,45 @@ export class ConversationController {
 		});
 	}
 
+	async renameGroupConversation(
+		request: Request,
+		response: Response,
+	): Promise<void> {
+		const userId = request.session.userId;
+
+		if (userId === undefined) {
+			response.status(401).json({
+				error: "Authentication required",
+			});
+			return;
+		}
+
+		const conversationId = Number(
+			request.params.conversationId,
+		);
+
+		const conversation =
+			await conversationService.renameGroupConversation(
+				userId,
+				conversationId,
+				request.body.name,
+			);
+
+		for (const participant of conversation.participants) {
+			getIO()
+				.to(`user:${participant.userId}`)
+				.emit(
+					"conversationUpdated",
+					conversation,
+				);
+		}
+
+		response.status(200).json({
+			message: "Group conversation renamed",
+			conversation,
+		});
+	}
+
 	async getUserConversations(
 		request: Request,
 		response: Response,

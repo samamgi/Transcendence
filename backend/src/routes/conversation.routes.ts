@@ -26,6 +26,16 @@ router.post(
 	),
 );
 
+router.patch(
+	"/groups/:conversationId/name",
+	requireAuth,
+	asyncHandler(
+		conversationController.renameGroupConversation.bind(
+			conversationController,
+		),
+	),
+);
+
 router.post(
 	"/groups",
 	requireAuth,

@@ -98,6 +98,57 @@ export class ConversationRepository {
 		});
 	}
 
+	async findGroupConversation(
+		conversationId: number,
+	) {
+		return prisma.conversation.findFirst({
+			where: {
+				id: conversationId,
+				type: "GROUP",
+			},
+			select: {
+				id: true,
+				ownerId: true,
+			},
+		});
+	}
+
+	async updateGroupName(
+		conversationId: number,
+		name: string,
+	) {
+		return prisma.conversation.update({
+			where: {
+				id: conversationId,
+			},
+			data: {
+				name,
+			},
+			include: {
+				owner: {
+					select: {
+						id: true,
+						username: true,
+						displayName: true,
+						avatarUrl: true,
+					},
+				},
+				participants: {
+					include: {
+						user: {
+							select: {
+								id: true,
+								username: true,
+								displayName: true,
+								avatarUrl: true,
+							},
+						},
+					},
+				},
+			},
+		});
+	}
+
 	async findUserConversations(userId: number) {
 		const conversations =
 			await prisma.conversation.findMany({
