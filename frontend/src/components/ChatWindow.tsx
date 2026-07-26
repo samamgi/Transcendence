@@ -31,6 +31,16 @@ type RemovedReaction = {
   userId: number
 }
 
+type DeletedMessage = {
+  id: number
+  conversationId: number
+}
+
+type DeleteMessageResponse = {
+  message?: string
+  error?: string
+}
+
 type ReplyMessage = {
   id: number
   conversationId: number
@@ -167,6 +177,8 @@ export default function ChatWindow({
     useState<number | null>(null)
   const [editContent, setEditContent] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
+  const [deletingMessageId, setDeletingMessageId] =
+    useState<number | null>(null)
   const [replyingTo, setReplyingTo] =
     useState<ChatMessage | null>(null)
 
@@ -301,6 +313,36 @@ export default function ChatWindow({
       )
     }
 
+    function handleMessageDeleted(
+      deletedMessage: DeletedMessage,
+    ): void {
+      if (
+        deletedMessage.conversationId !==
+        conversation.id
+      ) {
+        return
+      }
+
+      setMessages((currentMessages) =>
+        currentMessages.filter(
+          (message) =>
+            message.id !== deletedMessage.id,
+        ),
+      )
+
+      setReplyingTo((currentMessage) =>
+        currentMessage?.id === deletedMessage.id
+          ? null
+          : currentMessage,
+      )
+
+      setEditingMessageId((currentMessageId) =>
+        currentMessageId === deletedMessage.id
+          ? null
+          : currentMessageId,
+      )
+    }
+
     function handleReactionAdded(
       reaction: MessageReaction,
     ): void {
@@ -403,6 +445,10 @@ export default function ChatWindow({
       handleMessageUpdated,
     )
     socket.on(
+      'messageDeleted',
+      handleMessageDeleted,
+    )
+    socket.on(
       'messageReactionAdded',
       handleReactionAdded,
     )
@@ -444,6 +490,10 @@ export default function ChatWindow({
       socket.off(
         'messageUpdated',
         handleMessageUpdated,
+      )
+      socket.off(
+        'messageDeleted',
+        handleMessageDeleted,
       )
       socket.off(
         'messageReactionAdded',
@@ -631,6 +681,66 @@ export default function ChatWindow({
       )
     } finally {
       setSavingEdit(false)
+    }
+  }
+
+  async function deleteMessage(
+    message: ChatMessage,
+  ): Promise<void> {
+    const confirmed = window.confirm(
+      'Delete this message?',
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    setDeletingMessageId(message.id)
+    onError('')
+
+    try {
+      const response = await fetch(
+        `/api/conversations/messages/${message.id}`,
+        {
+          method: 'DELETE',
+          credentials: 'include',
+        },
+      )
+
+      const payload =
+        (await response.json()) as DeleteMessageResponse
+
+      if (!response.ok) {
+        throw new Error(
+          payload.error ?? 'Unable to delete message',
+        )
+      }
+
+      setMessages((currentMessages) =>
+        currentMessages.filter(
+          (currentMessage) =>
+            currentMessage.id !== message.id,
+        ),
+      )
+
+      setReplyingTo((currentMessage) =>
+        currentMessage?.id === message.id
+          ? null
+          : currentMessage,
+      )
+
+      if (editingMessageId === message.id) {
+        setEditingMessageId(null)
+        setEditContent('')
+      }
+    } catch (caughtError) {
+      onError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Unable to delete message',
+      )
+    } finally {
+      setDeletingMessageId(null)
     }
   }
 
@@ -842,15 +952,38 @@ export default function ChatWindow({
 
                     {message.senderId ===
                       currentUserId && (
-                      <button
-                        type="button"
-                        className="edit-button"
-                        onClick={() =>
-                          startEditing(message)
-                        }
-                      >
-                        Edit
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          className="edit-button"
+                          disabled={
+                            deletingMessageId ===
+                            message.id
+                          }
+                          onClick={() =>
+                            startEditing(message)
+                          }
+                        >
+                          Edit
+                        </button>
+
+                        <button
+                          type="button"
+                          className="delete-button"
+                          disabled={
+                            deletingMessageId ===
+                            message.id
+                          }
+                          onClick={() =>
+                            void deleteMessage(message)
+                          }
+                        >
+                          {deletingMessageId ===
+                          message.id
+                            ? 'Deleting...'
+                            : 'Delete'}
+                        </button>
+                      </>
                     )}
                   </>
                 )}
