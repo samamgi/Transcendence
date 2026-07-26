@@ -65,6 +65,11 @@ type SendMessageResponse = {
   error?: string
 }
 
+type UpdateMessageResponse = {
+  message?: ChatMessage
+  error?: string
+}
+
 type ReactionResponse = {
   success: boolean
   reaction?: MessageReaction
@@ -158,6 +163,10 @@ export default function ChatWindow({
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [editingMessageId, setEditingMessageId] =
+    useState<number | null>(null)
+  const [editContent, setEditContent] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
   const [replyingTo, setReplyingTo] =
     useState<ChatMessage | null>(null)
 
@@ -261,6 +270,37 @@ export default function ChatWindow({
       })
     }
 
+    function handleMessageUpdated(
+      updatedMessage: ChatMessage,
+    ): void {
+      if (
+        updatedMessage.conversationId !==
+        conversation.id
+      ) {
+        return
+      }
+
+      setMessages((currentMessages) =>
+        currentMessages.map((message) =>
+          message.id === updatedMessage.id
+            ? {
+                ...message,
+                ...updatedMessage,
+                reactions:
+                  updatedMessage.reactions ??
+                  message.reactions,
+                replyTo:
+                  updatedMessage.replyTo ??
+                  message.replyTo,
+                replyToId:
+                  updatedMessage.replyToId ??
+                  message.replyToId,
+              }
+            : message,
+        ),
+      )
+    }
+
     function handleReactionAdded(
       reaction: MessageReaction,
     ): void {
@@ -359,6 +399,10 @@ export default function ChatWindow({
 
     socket.on('newMessage', handleNewMessage)
     socket.on(
+      'messageUpdated',
+      handleMessageUpdated,
+    )
+    socket.on(
       'messageReactionAdded',
       handleReactionAdded,
     )
@@ -397,6 +441,10 @@ export default function ChatWindow({
       )
 
       socket.off('newMessage', handleNewMessage)
+      socket.off(
+        'messageUpdated',
+        handleMessageUpdated,
+      )
       socket.off(
         'messageReactionAdded',
         handleReactionAdded,
@@ -501,6 +549,89 @@ export default function ChatWindow({
         }
       },
     )
+  }
+
+  function startEditing(message: ChatMessage): void {
+    setEditingMessageId(message.id)
+    setEditContent(message.content)
+    onError('')
+  }
+
+  function cancelEditing(): void {
+    setEditingMessageId(null)
+    setEditContent('')
+  }
+
+  async function saveEditedMessage(
+    messageId: number,
+  ): Promise<void> {
+    const trimmedContent = editContent.trim()
+
+    if (!trimmedContent) {
+      onError('Message content is required')
+      return
+    }
+
+    setSavingEdit(true)
+    onError('')
+
+    try {
+      const response = await fetch(
+        `/api/conversations/messages/${messageId}`,
+        {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            content: trimmedContent,
+          }),
+        },
+      )
+
+      const payload =
+        (await response.json()) as UpdateMessageResponse
+
+      if (!response.ok) {
+        throw new Error(
+          payload.error ?? 'Unable to edit message',
+        )
+      }
+
+      if (payload.message) {
+        setMessages((currentMessages) =>
+          currentMessages.map((message) =>
+            message.id === payload.message?.id
+              ? {
+                  ...message,
+                  ...payload.message,
+                  reactions:
+                    payload.message.reactions ??
+                    message.reactions,
+                  replyTo:
+                    payload.message.replyTo ??
+                    message.replyTo,
+                  replyToId:
+                    payload.message.replyToId ??
+                    message.replyToId,
+                }
+              : message,
+          ),
+        )
+      }
+
+      setEditingMessageId(null)
+      setEditContent('')
+    } catch (caughtError) {
+      onError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Unable to edit message',
+      )
+    } finally {
+      setSavingEdit(false)
+    }
   }
 
   function handleContentChange(
@@ -662,15 +793,67 @@ export default function ChatWindow({
                   </blockquote>
                 )}
 
-                <p>{message.content}</p>
+                {editingMessageId === message.id ? (
+                  <div className="message-edit-form">
+                    <textarea
+                      value={editContent}
+                      onChange={(event) =>
+                        setEditContent(event.target.value)
+                      }
+                      disabled={savingEdit}
+                    />
 
-                <button
-                  type="button"
-                  className="reply-button"
-                  onClick={() => setReplyingTo(message)}
-                >
-                  Reply
-                </button>
+                    <button
+                      type="button"
+                      disabled={
+                        savingEdit ||
+                        !editContent.trim()
+                      }
+                      onClick={() =>
+                        void saveEditedMessage(message.id)
+                      }
+                    >
+                      Save
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={savingEdit}
+                      onClick={cancelEditing}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <p>{message.content}</p>
+                )}
+
+                {editingMessageId !== message.id && (
+                  <>
+                    <button
+                      type="button"
+                      className="reply-button"
+                      onClick={() =>
+                        setReplyingTo(message)
+                      }
+                    >
+                      Reply
+                    </button>
+
+                    {message.senderId ===
+                      currentUserId && (
+                      <button
+                        type="button"
+                        className="edit-button"
+                        onClick={() =>
+                          startEditing(message)
+                        }
+                      >
+                        Edit
+                      </button>
+                    )}
+                  </>
+                )}
 
                 <div
                   className="message-reactions"
