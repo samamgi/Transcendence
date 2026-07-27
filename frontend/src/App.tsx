@@ -1339,7 +1339,44 @@ function App() {
               className={page === 'social' ? 'active' : ''}
               onClick={openSocialPage}
             >
-              <span aria-hidden="true">●</span>
+              <span
+                aria-hidden="true"
+                className="nav-icon nav-icon--social"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="20"
+                  height="20"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M7.2 10.2h9.6a4 4 0 0 1 3.88 5l-.72 2.6a2.1 2.1 0 0 1-3.35 1.07l-1.68-1.28a4.2 4.2 0 0 0-5.06 0l-1.68 1.28a2.1 2.1 0 0 1-3.35-1.07l-.72-2.6a4 4 0 0 1 3.88-5Z"
+                    stroke="currentColor"
+                    strokeWidth="1.55"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M8.9 14h2.8M10.3 12.6v2.8"
+                    stroke="currentColor"
+                    strokeWidth="1.55"
+                    strokeLinecap="round"
+                  />
+                  <circle
+                    cx="15.9"
+                    cy="13.2"
+                    r="1.1"
+                    fill="currentColor"
+                  />
+                  <circle
+                    cx="18"
+                    cy="14.9"
+                    r="1.1"
+                    fill="currentColor"
+                  />
+                </svg>
+              </span>
               Social
 
               {hasSocialNotification && (
@@ -1355,7 +1392,32 @@ function App() {
               className={page === 'profile' ? 'active' : ''}
               onClick={() => openProfilePage()}
             >
-              <span aria-hidden="true">◆</span>
+              <span
+                aria-hidden="true"
+                className="nav-icon"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="18"
+                  height="18"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <circle
+                    cx="12"
+                    cy="8"
+                    r="3"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  />
+                  <path
+                    d="M5.5 18.5a6.5 6.5 0 0 1 13 0"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </span>
               Profile
             </button>
           </nav>

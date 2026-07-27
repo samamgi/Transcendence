@@ -960,6 +960,30 @@ small {
   font-weight: 700;
 }
 
+.main-navigation .nav-icon {
+  width: 1.32rem;
+  height: 1.32rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.main-navigation .nav-icon svg {
+  width: 1.32rem;
+  height: 1.32rem;
+  display: block;
+}
+
+.main-navigation .nav-icon--social {
+  width: 1.44rem;
+  height: 1.44rem;
+}
+
+.main-navigation .nav-icon--social svg {
+  width: 1.44rem;
+  height: 1.44rem;
+}
+
 .main-navigation button:hover {
   background: rgb(51 65 85 / 65%);
   color: #e2e8f0;
