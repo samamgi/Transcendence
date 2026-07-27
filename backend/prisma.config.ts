@@ -1,5 +1,7 @@
 import "dotenv/config";
-import { defineConfig, env } from "prisma/config";
+import { defineConfig } from "prisma/config";
+
+const fallbackDatabaseUrl = "postgresql://postgres:postgres@localhost:5432/transcendence";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -7,6 +9,8 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: env("DATABASE_URL"),
+    // `prisma generate` during image build must not crash when DATABASE_URL is
+    // only provided at runtime by Compose.
+    url: process.env.DATABASE_URL ?? fallbackDatabaseUrl,
   },
 });

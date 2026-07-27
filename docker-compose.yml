@@ -21,5 +21,30 @@ services:
       timeout: 5s
       retries: 5
 
+  backend:
+    build:
+      context: ./backend
+    container_name: transcendence-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://transcendence:transcendence_password@database:5432/transcendence
+      SESSION_SECRET: change_me_before_production
+      PORT: 3000
+      NODE_ENV: production
+    depends_on:
+      database:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: transcendence-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+      - "8443:443"
+
 volumes:
   postgres_data:

@@ -10,6 +10,7 @@ import { io, type Socket } from 'socket.io-client'
 import ChatWindow from './components/ChatWindow'
 import HomePage from './pages/HomePage'
 import PlayPage from './pages/PlayPage'
+import TournamentPage from './pages/TournamentPage'
 import ConversationList, {
   type Conversation,
 } from './components/ConversationList'
@@ -103,6 +104,7 @@ type AuthMode = 'login' | 'register'
 type Page =
   | 'home'
   | 'play'
+  | 'tournament'
   | 'social'
   | 'profile'
 
@@ -355,6 +357,10 @@ function App() {
 
   const [page, setPage] =
     useState<Page>('home')
+
+  useEffect(() => {
+    document.title = 'Transcendence'
+  }, [])
 
   const pageRef = useRef<Page>('home')
   const profileScrollTargetRef =
@@ -1336,6 +1342,54 @@ function App() {
 
             <button
               type="button"
+              className={page === 'tournament' ? 'active' : ''}
+              onClick={() => setPage('tournament')}
+            >
+              <span
+                aria-hidden="true"
+                className="nav-icon nav-icon--tournament"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="18"
+                  height="18"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M4.5 16h15l-1.1-7.8-3.4 3-3-4.2-3 4.2-3.4-3L4.5 16Z"
+                    fill="#d4af37"
+                    stroke="#8a6a12"
+                    strokeWidth="1.05"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M5.8 16h12.4v2.2H5.8V16Z"
+                    fill="#c89f2d"
+                    stroke="#8a6a12"
+                    strokeWidth="1.05"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M9.1 8.5 7.3 6.3M12 7.2V4.7M14.9 8.5l1.8-2.2"
+                    fill="none"
+                    stroke="#8a6a12"
+                    strokeWidth="1.05"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <circle cx="7.3" cy="6.3" r="0.55" fill="#8a6a12" />
+                  <circle cx="12" cy="4.7" r="0.55" fill="#8a6a12" />
+                  <circle cx="16.7" cy="6.3" r="0.55" fill="#8a6a12" />
+                </svg>
+              </span>
+              Tournament
+            </button>
+
+            <button
+              type="button"
               className={page === 'social' ? 'active' : ''}
               onClick={openSocialPage}
             >
@@ -1433,7 +1487,7 @@ function App() {
               onOpenStatistics={() =>
                 openProfilePage('statistics')
               }
-              onOpenTournament={() => setPage('play')}
+              onOpenTournament={() => setPage('tournament')}
             />
           )}
 
@@ -1442,6 +1496,10 @@ function App() {
               socket={socket}
               controlScheme={controlScheme}
             />
+          )}
+
+          {page === 'tournament' && (
+            <TournamentPage currentUserId={user.id} />
           )}
 
           {page === 'profile' && (
@@ -1936,6 +1994,16 @@ function App() {
           {success && <p className="message success">{success}</p>}
 
         </section>
+
+        <footer className="legal-footer">
+          <a href="/privacy-policy.html" target="_blank" rel="noreferrer">
+            Privacy Policy
+          </a>
+          <span aria-hidden="true">•</span>
+          <a href="/terms-of-service.html" target="_blank" rel="noreferrer">
+            Terms of Service
+          </a>
+        </footer>
       </main>
     )
   }
@@ -2032,6 +2100,16 @@ function App() {
         </form>
 
         {error && <p className="message error">{error}</p>}
+
+        <footer className="legal-footer legal-footer-auth">
+          <a href="/privacy-policy.html" target="_blank" rel="noreferrer">
+            Privacy Policy
+          </a>
+          <span aria-hidden="true">•</span>
+          <a href="/terms-of-service.html" target="_blank" rel="noreferrer">
+            Terms of Service
+          </a>
+        </footer>
       </section>
     </main>
   )

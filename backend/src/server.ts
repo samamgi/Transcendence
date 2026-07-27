@@ -11,6 +11,7 @@ import blockRoutes from "./routes/block.routes.js";
 import conversationRoutes from "./routes/conversation.routes.js";
 import gameRoutes from "./routes/game.routes.js";
 import matchRoutes from "./routes/match.routes.js";
+import tournamentRoutes from "./routes/tournament.routes.js";
 import { errorHandler } from "./middlewares/error-handler.middleware.js";
 import { initializeSocket } from "./socket/index.js";
 
@@ -58,6 +59,7 @@ app.use("/api/blocks", blockRoutes);
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/games", gameRoutes);
 app.use("/api/matches", matchRoutes);
+app.use("/api/tournaments", tournamentRoutes);
 
 app.use((_request, response) => {
 	response.status(404).json({
