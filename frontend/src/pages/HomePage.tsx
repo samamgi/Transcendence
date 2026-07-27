@@ -1,15 +1,23 @@
 type HomePageProps = {
   username: string
   onlineFriendsCount: number
+  totalMatches: number
+  winRate: number
   onPlay: () => void
   onSocial: () => void
+  onOpenStatistics: () => void
+  onOpenTournament: () => void
 }
 
 export default function HomePage({
   username,
   onlineFriendsCount,
+  totalMatches,
+  winRate,
   onPlay,
   onSocial,
+  onOpenStatistics,
+  onOpenTournament,
 }: HomePageProps) {
   return (
     <section className="home-page">
@@ -18,7 +26,7 @@ export default function HomePage({
           <p className="eyebrow">WELCOME BACK</p>
 
           <h2>
-            Ready to play, {username}?
+            Ready to play, {username} ?
           </h2>
 
           <p>
@@ -59,44 +67,49 @@ export default function HomePage({
       <section className="dashboard-grid">
         <article className="dashboard-card">
           <p className="dashboard-card-label">
-            QUICK PLAY
+            TOURNAMENT
           </p>
 
-          <h3>Enter the arena</h3>
+          <h3>Future tournament hub</h3>
 
           <p>
-            Start a match immediately and choose your
-            preferred game mode.
+            Access the upcoming tournament space and
+            follow future competitive brackets.
           </p>
 
-          <button type="button" onClick={onPlay}>
-            Choose a mode
+          <button
+            type="button"
+            onClick={onOpenTournament}
+          >
+            Open tournament
           </button>
         </article>
 
         <article className="dashboard-card">
           <p className="dashboard-card-label">
-            GAME MODES
+            STATISTICS
           </p>
 
-          <h3>Three ways to play</h3>
+          <h3>Online match summary</h3>
 
-          <ul className="home-mode-list">
-            <li>
-              <strong>Local</strong>
-              <span>Two players, one keyboard</span>
-            </li>
+          <div className="home-stats-mini">
+            <div>
+              <span>Win rate</span>
+              <strong>{winRate}%</strong>
+            </div>
 
-            <li>
-              <strong>Against AI</strong>
-              <span>Solo game against the computer</span>
-            </li>
+            <div>
+              <span>Matches</span>
+              <strong>{totalMatches}</strong>
+            </div>
+          </div>
 
-            <li>
-              <strong>Online</strong>
-              <span>Real-time multiplayer matchmaking</span>
-            </li>
-          </ul>
+          <button
+            type="button"
+            onClick={onOpenStatistics}
+          >
+            View details
+          </button>
         </article>
 
         <article className="dashboard-card">

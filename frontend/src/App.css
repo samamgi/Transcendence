@@ -657,8 +657,9 @@ small {
 .dashboard-grid,
 .game-mode-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(14.5rem, 18rem));
   gap: 1rem;
+  justify-content: center;
 }
 
 .dashboard-card,
@@ -2358,12 +2359,16 @@ small {
 }
 
 .dashboard-card {
+  min-height: 15rem;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
   align-content: start;
+  gap: 0.7rem;
 }
 
 .dashboard-card h3,
 .dashboard-card p {
-  margin-top: 0;
+  margin: 0;
 }
 
 .dashboard-card-label {
@@ -2400,9 +2405,45 @@ small {
 
 .home-online-count {
   display: block;
-  margin-bottom: 0.35rem;
+  margin: 0;
   color: #dbeafe;
   font-size: 3rem;
+}
+
+.home-stats-mini {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.home-stats-mini > div {
+  padding: 0.65rem;
+  border: 1px solid rgb(148 163 184 / 20%);
+  border-radius: 0.65rem;
+  background: rgb(2 6 23 / 42%);
+}
+
+.home-stats-mini span {
+  color: #94a3b8;
+  font-size: 0.74rem;
+}
+
+.home-stats-mini strong {
+  display: block;
+  margin-top: 0.25rem;
+  color: #f8fafc;
+  font-size: 1.3rem;
+}
+
+.app-shell .dashboard-card button {
+  border-color: rgb(96 165 250 / 38%);
+  background: rgb(37 99 235 / 20%);
+  color: #dbeafe;
+  font-weight: 700;
+}
+
+.app-shell .dashboard-card button:hover:not(:disabled) {
+  background: rgb(37 99 235 / 34%);
 }
 
 @media (max-width: 850px) {

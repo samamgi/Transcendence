@@ -224,6 +224,7 @@ export class UserService {
 				);
 
 		return {
+			total: result.played,
 			played: result.played,
 			wins: result.wins,
 			losses: result.losses,

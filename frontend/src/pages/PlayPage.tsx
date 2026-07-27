@@ -1,4 +1,5 @@
 import {
+  memo,
   useEffect,
   useRef,
   useState,
@@ -112,7 +113,7 @@ function resetBall(
   }
 }
 
-export default function PlayPage({
+function PlayPage({
   socket,
   controlScheme,
 }: PlayPageProps) {
@@ -944,7 +945,7 @@ export default function PlayPage({
             selectGameMode('computer')
           }
         >
-          Against computer
+          Practice mode
         </button>
 
         <button
@@ -1336,3 +1337,5 @@ export default function PlayPage({
     </section>
   )
 }
+
+export default memo(PlayPage)

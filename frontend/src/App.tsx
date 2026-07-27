@@ -106,6 +106,10 @@ type Page =
   | 'social'
   | 'profile'
 
+type ProfileScrollTarget =
+  | 'statistics'
+  | null
+
 type ControlScheme =
   | 'qwerty'
   | 'azerty'
@@ -141,6 +145,77 @@ type GameStatistics = {
   forfeitLosses: number
   history: MatchHistoryItem[]
 }
+
+function getMatchDisplayScores(
+  match: MatchHistoryItem,
+  currentUserId: number,
+): {
+  userScore: number
+  opponentScore: number
+} {
+  const rawMatch =
+    match as unknown as Record<string, unknown>
+
+  const directUserScore =
+    typeof rawMatch.userScore === 'number'
+      ? rawMatch.userScore
+      : null
+
+  const directOpponentScore =
+    typeof rawMatch.opponentScore === 'number'
+      ? rawMatch.opponentScore
+      : null
+
+  if (
+    directUserScore !== null &&
+    directOpponentScore !== null
+  ) {
+    return {
+      userScore: directUserScore,
+      opponentScore: directOpponentScore,
+    }
+  }
+
+  const player1Score =
+    typeof rawMatch.player1Score === 'number'
+      ? rawMatch.player1Score
+      : 0
+
+  const player2Score =
+    typeof rawMatch.player2Score === 'number'
+      ? rawMatch.player2Score
+      : 0
+
+  const player1Id =
+    typeof rawMatch.player1Id === 'number'
+      ? rawMatch.player1Id
+      : null
+
+  const player2Id =
+    typeof rawMatch.player2Id === 'number'
+      ? rawMatch.player2Id
+      : null
+
+  if (player1Id === currentUserId) {
+    return {
+      userScore: player1Score,
+      opponentScore: player2Score,
+    }
+  }
+
+  if (player2Id === currentUserId) {
+    return {
+      userScore: player2Score,
+      opponentScore: player1Score,
+    }
+  }
+
+  return {
+    userScore: player1Score,
+    opponentScore: player2Score,
+  }
+}
+
 
 type GameStatisticsResponse = {
   statistics?: GameStatistics
@@ -282,6 +357,8 @@ function App() {
     useState<Page>('home')
 
   const pageRef = useRef<Page>('home')
+  const profileScrollTargetRef =
+    useRef<ProfileScrollTarget>(null)
 
   const [
     socialUnreadMessageCount,
@@ -300,11 +377,6 @@ function App() {
 
   const [gameStatistics, setGameStatistics] =
     useState<GameStatistics | null>(null)
-
-  const [
-    gameStatisticsError,
-    setGameStatisticsError,
-  ] = useState('')
 
   const [gameStatisticsLoading, setGameStatisticsLoading] =
     useState(false)
@@ -356,13 +428,51 @@ function App() {
     }
   }
 
-  function openProfilePage(): void {
+  function openProfilePage(
+    scrollTarget: ProfileScrollTarget = null,
+  ): void {
+    profileScrollTargetRef.current = scrollTarget
     setPage('profile')
     void loadGameStatistics()
   }
 
   useEffect(() => {
-    if (!user || page !== 'profile') {
+    if (page !== 'profile') {
+      return
+    }
+
+    if (
+      profileScrollTargetRef.current !==
+      'statistics'
+    ) {
+      return
+    }
+
+    profileScrollTargetRef.current = null
+
+    const animationFrameId =
+      window.requestAnimationFrame(() => {
+        const statisticsSection =
+          document.getElementById(
+            'profile-statistics-section',
+          )
+
+        statisticsSection?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        })
+      })
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId)
+    }
+  }, [page])
+
+  useEffect(() => {
+    if (
+      !user ||
+      (page !== 'profile' && page !== 'home')
+    ) {
       return
     }
 
@@ -370,8 +480,6 @@ function App() {
 
     async function loadGameStatistics(): Promise<void> {
       setGameStatisticsLoading(true)
-      setGameStatisticsError('')
-
       try {
         const response = await fetch(
           '/api/users/me/statistics',
@@ -407,11 +515,11 @@ function App() {
         }
       } catch (caughtError) {
         if (!cancelled) {
-          setGameStatisticsError(
-            caughtError instanceof Error
-              ? caughtError.message
-              : 'Unable to load game statistics',
-          )
+        setError(
+          caughtError instanceof Error
+          ? caughtError.message
+          : 'Unable to load game statistics',
+        )
         }
       } finally {
         if (!cancelled) {
@@ -1061,7 +1169,6 @@ function App() {
       setSelectedConversation(null)
       setConversationRefreshKey(0)
       setGameStatistics(null)
-      setGameStatisticsError('')
       setPage('home')
       setMode('login')
     } catch (caughtError) {
@@ -1097,7 +1204,6 @@ function App() {
       setSelectedConversation(null)
       setConversationRefreshKey(0)
       setGameStatistics(null)
-      setGameStatisticsError('')
       setPage('home')
     } catch (caughtError) {
       setError(
@@ -1247,7 +1353,7 @@ function App() {
             <button
               type="button"
               className={page === 'profile' ? 'active' : ''}
-              onClick={openProfilePage}
+              onClick={() => openProfilePage()}
             >
               <span aria-hidden="true">◆</span>
               Profile
@@ -1258,8 +1364,14 @@ function App() {
             <HomePage
               username={user.displayName ?? user.username}
               onlineFriendsCount={onlineFriendIds.size}
+              totalMatches={gameStatistics?.total ?? 0}
+              winRate={gameStatistics?.winRate ?? 0}
               onPlay={() => setPage('play')}
               onSocial={openSocialPage}
+              onOpenStatistics={() =>
+                openProfilePage('statistics')
+              }
+              onOpenTournament={() => setPage('play')}
             />
           )}
 
@@ -1331,7 +1443,10 @@ function App() {
             </button>
           </form>
 
-          <section className="profile-statistics">
+          <section
+            className="profile-statistics"
+            id="profile-statistics-section"
+          >
             <div className="profile-statistics-heading">
               <div>
                 <p className="profile-statistics-label">
@@ -1362,7 +1477,7 @@ function App() {
                   <article>
                     <span>Matches</span>
                     <strong>
-                      {gameStatistics.played}
+                      {gameStatistics.total}
                     </strong>
                   </article>
 
@@ -1415,9 +1530,9 @@ function App() {
 
                             <span>
                               <strong>
-                                {match.userScore}
+                                {getMatchDisplayScores(match, user.id).userScore}
                                 {' - '}
-                                {match.opponentScore}
+                                {getMatchDisplayScores(match, user.id).opponentScore}
                               </strong>
 
                               <small>
@@ -1448,150 +1563,6 @@ function App() {
                 Statistics could not be loaded.
               </p>
             )}
-          </section>
-
-          <section
-            className="profile-statistics"
-            id="profile-statistics"
-          >
-            <div className="profile-statistics-header">
-              <div>
-                <p className="profile-statistics-label">
-                  GAME ACTIVITY
-                </p>
-                <h2>Match statistics</h2>
-                <p>
-                  Results from your recorded Pong matches.
-                </p>
-              </div>
-
-              {gameStatisticsLoading && (
-                <small>Loading statistics...</small>
-              )}
-            </div>
-
-            {gameStatisticsError && (
-              <p className="message error">
-                {gameStatisticsError}
-              </p>
-            )}
-
-            {!gameStatisticsLoading &&
-              !gameStatisticsError &&
-              gameStatistics && (
-                <>
-                  <div className="profile-stat-grid">
-                    <article>
-                      <span>Matches</span>
-                      <strong>
-                        {gameStatistics.total}
-                      </strong>
-                    </article>
-
-                    <article>
-                      <span>Wins</span>
-                      <strong>
-                        {gameStatistics.wins}
-                      </strong>
-                    </article>
-
-                    <article>
-                      <span>Losses</span>
-                      <strong>
-                        {gameStatistics.losses}
-                      </strong>
-                    </article>
-
-                    <article>
-                      <span>Win rate</span>
-                      <strong>
-                        {gameStatistics.winRate}%
-                      </strong>
-                    </article>
-                  </div>
-
-                  <div className="profile-forfeit-summary">
-                    <span>
-                      Forfeit wins:{' '}
-                      <strong>
-                        {gameStatistics.forfeitWins}
-                      </strong>
-                    </span>
-
-                    <span>
-                      Forfeit losses:{' '}
-                      <strong>
-                        {gameStatistics.forfeitLosses}
-                      </strong>
-                    </span>
-                  </div>
-
-                  <div className="match-history">
-                    <h3>Recent matches</h3>
-
-                    {gameStatistics.history.length === 0 ? (
-                      <p>
-                        No recorded matches yet. Complete an
-                        online match to populate your history.
-                      </p>
-                    ) : (
-                      <ul>
-                        {gameStatistics.history.map(
-                          (match) => {
-                            const currentUserIsPlayer1 =
-                              match.player1Id === user.id
-
-                            const opponent =
-                              currentUserIsPlayer1
-                                ? match.player2Username ??
-                                  'Computer'
-                                : match.player1Username
-
-                            const ownScore =
-                              currentUserIsPlayer1
-                                ? match.player1Score
-                                : match.player2Score
-
-                            const opponentScore =
-                              currentUserIsPlayer1
-                                ? match.player2Score
-                                : match.player1Score
-
-                            const won =
-                              match.winnerId === user.id
-
-                            return (
-                              <li key={match.id}>
-                                <div>
-                                  <strong>
-                                    {won ? 'Victory' : 'Defeat'}
-                                  </strong>
-                                  <small>
-                                    {match.mode} · vs {opponent}
-                                  </small>
-                                </div>
-
-                                <div className="match-history-result">
-                                  <strong>
-                                    {ownScore} - {opponentScore}
-                                  </strong>
-                                  <small>
-                                    {match.status === 'FORFEIT'
-                                      ? 'Forfeit'
-                                      : new Date(
-                                          match.finishedAt,
-                                        ).toLocaleString()}
-                                  </small>
-                                </div>
-                              </li>
-                            )
-                          },
-                        )}
-                      </ul>
-                    )}
-                  </div>
-                </>
-              )}
           </section>
 
           <section className="control-settings">

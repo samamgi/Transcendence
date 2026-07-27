@@ -299,10 +299,20 @@ function createOnlineGame(
 	clearInterval(game.interval);
 
 	let previousTime = Date.now();
+	let previousStateBroadcastTime = previousTime;
 
 	game.interval = setInterval(() => {
 		if (game.winner) {
-			emitOnlineGameState(server, game);
+			const now = Date.now();
+
+			if (
+				now - previousStateBroadcastTime >=
+				1000 / 30
+			) {
+				emitOnlineGameState(server, game);
+				previousStateBroadcastTime = now;
+			}
+
 			return;
 		}
 
@@ -449,7 +459,13 @@ function createOnlineGame(
 			}
 		}
 
-		emitOnlineGameState(server, game);
+		if (
+			currentTime - previousStateBroadcastTime >=
+			1000 / 30
+		) {
+			emitOnlineGameState(server, game);
+			previousStateBroadcastTime = currentTime;
+		}
 	}, 1000 / 60);
 
 	onlineGames.set(roomId, game);
@@ -972,8 +988,22 @@ export function initializeSocket(
 			const roomId =
 				onlineRoomBySocketId.get(socket.id);
 
+			const side =
+				onlineSideBySocketId.get(socket.id);
+
 			if (!roomId) {
 				return;
+			}
+
+			const game = onlineGames.get(roomId);
+
+			if (game && !game.winner && side) {
+				game.winner =
+					side === "left"
+						? "right"
+						: "left";
+
+				saveOnlineMatchResult(game);
 			}
 
 			onlineRoomBySocketId.delete(socket.id);

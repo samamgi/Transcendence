@@ -227,41 +227,41 @@ export class UserRepository {
 						WHERE "winnerId" IS NOT NULL
 						AND "winnerId" <> ${userId}
 					)::bigint AS "losses"
-				FROM "GameMatch"
+				FROM "Match"
 				WHERE
-					"player1Id" = ${userId}
-					OR "player2Id" = ${userId}
+					"leftPlayerId" = ${userId}
+					OR "rightPlayerId" = ${userId}
 			`;
 
 		const history =
 			await prisma.$queryRaw<HistoryRow[]>`
 				SELECT
-					match."id",
-					match."mode"::text AS "mode",
-					match."status"::text AS "status",
-					match."player1Id",
-					match."player2Id",
-					match."winnerId",
-					match."player1Score",
-					match."player2Score",
-					match."finishedAt",
+					online_match."id",
+					online_match."mode"::text AS "mode",
+					'FINISHED'::text AS "status",
+					online_match."leftPlayerId" AS "player1Id",
+					online_match."rightPlayerId" AS "player2Id",
+					online_match."winnerId",
+					online_match."leftScore" AS "player1Score",
+					online_match."rightScore" AS "player2Score",
+					online_match."finishedAt",
 					opponent."username"
 						AS "opponentUsername",
 					opponent."displayName"
 						AS "opponentDisplayName"
-				FROM "GameMatch" AS match
+				FROM "Match" AS online_match
 				LEFT JOIN "User" AS opponent
 					ON opponent."id" =
 						CASE
-							WHEN match."player1Id" = ${userId}
-								THEN match."player2Id"
-							ELSE match."player1Id"
+							WHEN online_match."leftPlayerId" = ${userId}
+								THEN online_match."rightPlayerId"
+							ELSE online_match."leftPlayerId"
 						END
 				WHERE
-					match."player1Id" = ${userId}
-					OR match."player2Id" = ${userId}
-				ORDER BY match."finishedAt" DESC
-				LIMIT 10
+					online_match."leftPlayerId" = ${userId}
+					OR online_match."rightPlayerId" = ${userId}
+				ORDER BY online_match."finishedAt" DESC
+				LIMIT 5
 			`;
 
 		return {
