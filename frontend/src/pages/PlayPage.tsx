@@ -137,6 +137,9 @@ export default function PlayPage({
   const [onlineGame, setOnlineGame] =
     useState<OnlineGameStateEvent | null>(null)
 
+  const onlineGameRef =
+    useRef<OnlineGameStateEvent | null>(null)
+
   const [isArenaExpanded, setIsArenaExpanded] =
     useState(false)
 
@@ -167,6 +170,10 @@ export default function PlayPage({
   useEffect(() => {
     gameRef.current = game
   }, [game])
+
+  useEffect(() => {
+    onlineGameRef.current = onlineGame
+  }, [onlineGame])
 
   useEffect(() => {
     gameModeRef.current = gameMode
@@ -229,9 +236,19 @@ export default function PlayPage({
     }
 
     function handleOpponentLeft(): void {
+      /*
+       * Après une fin normale, chacun choisit librement
+       * de rejouer ou de quitter. Ce n’est pas une
+       * déconnexion inattendue.
+       */
+      if (onlineGameRef.current?.winner) {
+        return
+      }
+
       setOnlineStatus('waiting')
       setOnlineRoomId(null)
       setOnlineSide(null)
+      setOnlineGame(null)
       setOnlineError(
         'Your opponent left the match. You were placed back in the queue.',
       )
@@ -744,6 +761,64 @@ export default function PlayPage({
     setGame(createInitialGameState())
   }
 
+  function resetOnlineMatchState(): void {
+    keysRef.current.clear()
+    setOnlineGame(null)
+    onlineGameRef.current = null
+    setOnlineRoomId(null)
+    setOnlineSide(null)
+    setOnlineError('')
+  }
+
+  function exitOnlineMatchmaking(): void {
+    if (socket?.connected) {
+      socket.emit(
+        'online:leaveQueue',
+        () => undefined,
+      )
+    }
+
+    resetOnlineMatchState()
+    setOnlineStatus('idle')
+  }
+
+  function returnToOnlineQueue(): void {
+    if (!socket?.connected) {
+      resetOnlineMatchState()
+      setOnlineStatus('idle')
+      setOnlineError(
+        'Online connection is unavailable.',
+      )
+      return
+    }
+
+    resetOnlineMatchState()
+    setOnlineStatus('waiting')
+
+    socket.emit(
+      'online:leaveQueue',
+      () => {
+        socket.emit(
+          'online:joinQueue',
+          (response: OnlineQueueResponse) => {
+            if (!response.success) {
+              setOnlineStatus('idle')
+              setOnlineError(
+                response.error ??
+                  'Unable to return to matchmaking.',
+              )
+              return
+            }
+
+            setOnlineStatus(
+              response.status ?? 'waiting',
+            )
+          },
+        )
+      },
+    )
+  }
+
   function leaveOnlineQueue(): void {
     if (socket?.connected) {
       socket.emit(
@@ -1045,12 +1120,22 @@ export default function PlayPage({
                       {onlineGame.rightScore}
                     </p>
 
-                    <button
-                      type="button"
-                      onClick={leaveOnlineQueue}
-                    >
-                      Leave match
-                    </button>
+                    <div className="online-end-actions">
+                      <button
+                        type="button"
+                        onClick={returnToOnlineQueue}
+                      >
+                        Play again
+                      </button>
+
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={exitOnlineMatchmaking}
+                      >
+                        Exit matchmaking
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

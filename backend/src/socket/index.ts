@@ -235,7 +235,7 @@ function createOnlineGame(
 		ONLINE_FIELD_HEIGHT / 2 -
 		ONLINE_PADDLE_HEIGHT / 2;
 
-	const game = {
+	const game: OnlineGame = {
 		roomId,
 		leftPaddleY: initialPaddleY,
 		rightPaddleY: initialPaddleY,
@@ -252,7 +252,7 @@ function createOnlineGame(
 		rightScore: 0,
 		winner: null,
 		interval: setInterval(() => undefined, 1000),
-	} satisfies OnlineGame;
+	};
 
 	clearInterval(game.interval);
 
@@ -1065,8 +1065,14 @@ export function initializeSocket(
 						"right",
 					);
 
+					if (!io) {
+						throw new Error(
+							"Socket.IO server is unavailable",
+						);
+					}
+
 					createOnlineGame(
-						socket.nsp,
+						io,
 						roomId,
 					);
 

@@ -2223,3 +2223,40 @@ small {
     right: 0.55rem;
   }
 }
+
+/* Online match end actions */
+
+.online-end-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.online-end-actions button {
+  min-width: 10rem;
+}
+
+.app-shell .online-end-actions .secondary-button {
+  border-color: rgb(148 163 184 / 35%);
+  background: rgb(15 23 42 / 88%);
+  color: #e2e8f0;
+}
+
+.app-shell
+  .online-end-actions
+  .secondary-button:hover:not(:disabled) {
+  background: rgb(51 65 85 / 88%);
+}
+
+@media (max-width: 520px) {
+  .online-end-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .online-end-actions button {
+    width: 100%;
+  }
+}
