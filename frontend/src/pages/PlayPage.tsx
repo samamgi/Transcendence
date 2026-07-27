@@ -886,7 +886,7 @@ export default function PlayPage({
       }
     >
       <div className="play-header">
-        <p className="eyebrow">LOCAL PONG</p>
+        <p className="eyebrow">PONG</p>
         <h2>Pong Arena</h2>
         <p>
           {gameMode === 'computer'

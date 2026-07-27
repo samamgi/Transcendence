@@ -37,6 +37,12 @@ model User {
   ownedConversations       Conversation[]            @relation("ConversationOwner")
   blockedUsers             UserBlock[]               @relation("BlockedUsers")
   blockedBy                UserBlock[]               @relation("BlockedBy")
+  matchesAsLeft            Match[]                   @relation("MatchLeftPlayer")
+  matchesAsRight           Match[]                   @relation("MatchRightPlayer")
+  wonMatches               Match[]                   @relation("MatchWinner")
+  matchesAsPlayer1 GameMatch[] @relation("GameMatchPlayer1")
+  matchesAsPlayer2 GameMatch[] @relation("GameMatchPlayer2")
+  wonGameMatches    GameMatch[] @relation("GameMatchWinner")
 }
 
 model FriendRequest {
@@ -158,4 +164,61 @@ model MessageReaction {
   @@unique([messageId, userId])
   @@index([messageId])
   @@index([userId])
+}
+
+
+enum MatchMode {
+  ONLINE
+}
+
+model Match {
+  id Int @id @default(autoincrement())
+
+  mode MatchMode @default(ONLINE)
+
+  leftPlayerId  Int
+  rightPlayerId Int
+  winnerId      Int
+
+  leftScore  Int
+  rightScore Int
+
+  createdAt  DateTime @default(now())
+  finishedAt DateTime @default(now())
+
+  leftPlayer  User @relation("MatchLeftPlayer", fields: [leftPlayerId], references: [id], onDelete: Cascade)
+  rightPlayer User @relation("MatchRightPlayer", fields: [rightPlayerId], references: [id], onDelete: Cascade)
+  winner      User @relation("MatchWinner", fields: [winnerId], references: [id], onDelete: Cascade)
+
+  @@index([leftPlayerId])
+  @@index([rightPlayerId])
+  @@index([winnerId])
+  @@index([finishedAt])
+}
+
+
+model GameMatch {
+  id Int @id @default(autoincrement())
+
+  mode   String
+  status String
+
+  player1Id Int
+  player2Id Int?
+  winnerId  Int?
+
+  player1Score Int
+  player2Score Int
+
+  startedAt  DateTime @default(now())
+  finishedAt DateTime @default(now())
+
+  player1 User  @relation("GameMatchPlayer1", fields: [player1Id], references: [id], onDelete: Cascade)
+  player2 User? @relation("GameMatchPlayer2", fields: [player2Id], references: [id], onDelete: SetNull)
+  winner  User? @relation("GameMatchWinner", fields: [winnerId], references: [id], onDelete: SetNull)
+
+  @@index([player1Id])
+  @@index([player2Id])
+  @@index([winnerId])
+  @@index([finishedAt])
 }

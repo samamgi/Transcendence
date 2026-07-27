@@ -200,6 +200,71 @@ export class UserService {
 		}
 	}
 
+	async getGameStatistics(userId: number) {
+		if (
+			!Number.isInteger(userId) ||
+			userId <= 0
+		) {
+			throw new HttpError(
+				400,
+				"Invalid user id",
+			);
+		}
+
+		const result =
+			await userRepository.getGameStatistics(
+				userId,
+			);
+
+		const winRate =
+			result.played === 0
+				? 0
+				: Math.round(
+					(result.wins / result.played) * 100,
+				);
+
+		return {
+			played: result.played,
+			wins: result.wins,
+			losses: result.losses,
+			winRate,
+			history: result.history.map((match) => {
+				const isPlayer1 =
+					match.player1Id === userId;
+
+				const userScore = isPlayer1
+					? match.player1Score
+					: match.player2Score;
+
+				const opponentScore = isPlayer1
+					? match.player2Score
+					: match.player1Score;
+
+				return {
+					id: match.id,
+					mode: match.mode,
+					status: match.status,
+					result:
+						match.winnerId === userId
+							? "WIN"
+							: match.winnerId === null
+								? "DRAW"
+								: "LOSS",
+					userScore,
+					opponentScore,
+					opponent:
+						match.opponentDisplayName ??
+						match.opponentUsername ??
+						(match.mode === "AI"
+							? "Computer"
+							: "Local player"),
+					finishedAt:
+						match.finishedAt,
+				};
+			}),
+		};
+	}
+
 	async searchUsers(
 		userId: number,
 		query: string,

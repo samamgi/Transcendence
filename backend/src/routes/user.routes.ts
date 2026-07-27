@@ -26,6 +26,16 @@ router.post(
 );
 
 router.get(
+	"/me/statistics",
+	requireAuth,
+	asyncHandler(
+		userController.getMyGameStatistics.bind(
+			userController,
+		),
+	),
+);
+
+router.get(
 	"/search",
 	requireAuth,
 	asyncHandler(

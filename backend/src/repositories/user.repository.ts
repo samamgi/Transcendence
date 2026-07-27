@@ -195,6 +195,83 @@ export class UserRepository {
 		});
 	}
 
+	async getGameStatistics(userId: number) {
+		type SummaryRow = {
+			played: bigint;
+			wins: bigint;
+			losses: bigint;
+		};
+
+		type HistoryRow = {
+			id: number;
+			mode: string;
+			status: string;
+			player1Id: number;
+			player2Id: number | null;
+			winnerId: number | null;
+			player1Score: number;
+			player2Score: number;
+			finishedAt: Date;
+			opponentUsername: string | null;
+			opponentDisplayName: string | null;
+		};
+
+		const [summary] =
+			await prisma.$queryRaw<SummaryRow[]>`
+				SELECT
+					COUNT(*)::bigint AS "played",
+					COUNT(*) FILTER (
+						WHERE "winnerId" = ${userId}
+					)::bigint AS "wins",
+					COUNT(*) FILTER (
+						WHERE "winnerId" IS NOT NULL
+						AND "winnerId" <> ${userId}
+					)::bigint AS "losses"
+				FROM "GameMatch"
+				WHERE
+					"player1Id" = ${userId}
+					OR "player2Id" = ${userId}
+			`;
+
+		const history =
+			await prisma.$queryRaw<HistoryRow[]>`
+				SELECT
+					match."id",
+					match."mode"::text AS "mode",
+					match."status"::text AS "status",
+					match."player1Id",
+					match."player2Id",
+					match."winnerId",
+					match."player1Score",
+					match."player2Score",
+					match."finishedAt",
+					opponent."username"
+						AS "opponentUsername",
+					opponent."displayName"
+						AS "opponentDisplayName"
+				FROM "GameMatch" AS match
+				LEFT JOIN "User" AS opponent
+					ON opponent."id" =
+						CASE
+							WHEN match."player1Id" = ${userId}
+								THEN match."player2Id"
+							ELSE match."player1Id"
+						END
+				WHERE
+					match."player1Id" = ${userId}
+					OR match."player2Id" = ${userId}
+				ORDER BY match."finishedAt" DESC
+				LIMIT 10
+			`;
+
+		return {
+			played: Number(summary?.played ?? 0n),
+			wins: Number(summary?.wins ?? 0n),
+			losses: Number(summary?.losses ?? 0n),
+			history,
+		};
+	}
+
 	async searchUsers(
 		userId: number,
 		query: string,

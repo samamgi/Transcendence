@@ -57,6 +57,20 @@ export class UserController {
 			user,
 		});
 	}
+	async getMyGameStatistics(
+		request: Request,
+		response: Response,
+	) {
+		const statistics =
+			await userService.getGameStatistics(
+				request.session.userId!,
+			);
+
+		response.status(200).json({
+			statistics,
+		});
+	}
+
 	async searchUsers(
 		request: Request,
 		response: Response,

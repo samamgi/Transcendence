@@ -9,6 +9,8 @@ import userRoutes from "./routes/user.routes.js";
 import friendRoutes from "./routes/friend.routes.js";
 import blockRoutes from "./routes/block.routes.js";
 import conversationRoutes from "./routes/conversation.routes.js";
+import gameRoutes from "./routes/game.routes.js";
+import matchRoutes from "./routes/match.routes.js";
 import { errorHandler } from "./middlewares/error-handler.middleware.js";
 import { initializeSocket } from "./socket/index.js";
 
@@ -54,6 +56,8 @@ app.use("/api/users", userRoutes);
 app.use("/api/friends", friendRoutes);
 app.use("/api/blocks", blockRoutes);
 app.use("/api/conversations", conversationRoutes);
+app.use("/api/games", gameRoutes);
+app.use("/api/matches", matchRoutes);
 
 app.use((_request, response) => {
 	response.status(404).json({

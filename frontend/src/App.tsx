@@ -110,6 +110,43 @@ type ControlScheme =
   | 'qwerty'
   | 'azerty'
 
+type MatchHistoryItem = {
+  id: number
+  mode: string
+  status?: string
+  result?: string
+  opponent?: string | null
+  score?: string
+
+  player1Id: number
+  player2Id: number | null
+  winnerId: number | null
+
+  player1Username: string
+  player2Username: string | null
+
+  player1Score: number
+  player2Score: number
+
+  startedAt: string
+  finishedAt: string
+}
+
+type GameStatistics = {
+  total: number
+  wins: number
+  losses: number
+  winRate: number
+  forfeitWins: number
+  forfeitLosses: number
+  history: MatchHistoryItem[]
+}
+
+type GameStatisticsResponse = {
+  statistics?: GameStatistics
+  error?: string
+}
+
 async function requestJson(
   url: string,
   options: RequestInit = {},
@@ -261,6 +298,17 @@ function App() {
     socialUnreadMessageCount > 0 ||
     hasUnseenSocialReaction
 
+  const [gameStatistics, setGameStatistics] =
+    useState<GameStatistics | null>(null)
+
+  const [
+    gameStatisticsError,
+    setGameStatisticsError,
+  ] = useState('')
+
+  const [gameStatisticsLoading, setGameStatisticsLoading] =
+    useState(false)
+
   const [controlScheme, setControlScheme] =
     useState<ControlScheme>(() =>
       window.localStorage.getItem(
@@ -273,6 +321,111 @@ function App() {
   useEffect(() => {
     pageRef.current = page
   }, [page])
+
+  async function loadGameStatistics(): Promise<void> {
+    setGameStatisticsLoading(true)
+
+    try {
+      const response = await fetch(
+        '/api/users/me/statistics',
+        {
+          credentials: 'include',
+        },
+      )
+
+      const payload =
+        (await response.json()) as
+          GameStatisticsResponse
+
+      if (!response.ok || !payload.statistics) {
+        throw new Error(
+          payload.error ??
+            'Unable to load game statistics',
+        )
+      }
+
+      setGameStatistics(payload.statistics)
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Unable to load game statistics',
+      )
+    } finally {
+      setGameStatisticsLoading(false)
+    }
+  }
+
+  function openProfilePage(): void {
+    setPage('profile')
+    void loadGameStatistics()
+  }
+
+  useEffect(() => {
+    if (!user || page !== 'profile') {
+      return
+    }
+
+    let cancelled = false
+
+    async function loadGameStatistics(): Promise<void> {
+      setGameStatisticsLoading(true)
+      setGameStatisticsError('')
+
+      try {
+        const response = await fetch(
+          '/api/users/me/statistics',
+          {
+            credentials: 'include',
+          },
+        )
+
+        const payload =
+          (await response.json()) as
+            GameStatisticsResponse
+
+        if (!response.ok || !payload.statistics) {
+          throw new Error(
+            payload.error ??
+              'Unable to load game statistics',
+          )
+        }
+
+        if (!cancelled) {
+          setGameStatistics({
+          ...payload.statistics,
+          total: payload.statistics.total ?? 0,
+          wins: payload.statistics.wins ?? 0,
+          losses: payload.statistics.losses ?? 0,
+          winRate: payload.statistics.winRate ?? 0,
+          forfeitWins:
+            payload.statistics.forfeitWins ?? 0,
+          forfeitLosses:
+            payload.statistics.forfeitLosses ?? 0,
+          history: payload.statistics.history ?? [],
+        })
+        }
+      } catch (caughtError) {
+        if (!cancelled) {
+          setGameStatisticsError(
+            caughtError instanceof Error
+              ? caughtError.message
+              : 'Unable to load game statistics',
+          )
+        }
+      } finally {
+        if (!cancelled) {
+          setGameStatisticsLoading(false)
+        }
+      }
+    }
+
+    void loadGameStatistics()
+
+    return () => {
+      cancelled = true
+    }
+  }, [page, user])
 
   function openSocialPage(): void {
     pageRef.current = 'social'
@@ -907,6 +1060,8 @@ function App() {
       setHasUnseenSocialReaction(false)
       setSelectedConversation(null)
       setConversationRefreshKey(0)
+      setGameStatistics(null)
+      setGameStatisticsError('')
       setPage('home')
       setMode('login')
     } catch (caughtError) {
@@ -941,6 +1096,8 @@ function App() {
       setHasUnseenSocialReaction(false)
       setSelectedConversation(null)
       setConversationRefreshKey(0)
+      setGameStatistics(null)
+      setGameStatisticsError('')
       setPage('home')
     } catch (caughtError) {
       setError(
@@ -1090,7 +1247,7 @@ function App() {
             <button
               type="button"
               className={page === 'profile' ? 'active' : ''}
-              onClick={() => setPage('profile')}
+              onClick={openProfilePage}
             >
               <span aria-hidden="true">◆</span>
               Profile
@@ -1173,6 +1330,269 @@ function App() {
               {avatarSubmitting ? 'Uploading...' : 'Upload avatar'}
             </button>
           </form>
+
+          <section className="profile-statistics">
+            <div className="profile-statistics-heading">
+              <div>
+                <p className="profile-statistics-label">
+                  GAME ACTIVITY
+                </p>
+                <h2>Statistics and match history</h2>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  void loadGameStatistics()
+                }
+                disabled={gameStatisticsLoading}
+              >
+                {gameStatisticsLoading
+                  ? 'Loading...'
+                  : 'Refresh'}
+              </button>
+            </div>
+
+            {gameStatisticsLoading &&
+            !gameStatistics ? (
+              <p>Loading statistics...</p>
+            ) : gameStatistics ? (
+              <>
+                <div className="profile-statistics-grid">
+                  <article>
+                    <span>Matches</span>
+                    <strong>
+                      {gameStatistics.played}
+                    </strong>
+                  </article>
+
+                  <article>
+                    <span>Wins</span>
+                    <strong>
+                      {gameStatistics.wins}
+                    </strong>
+                  </article>
+
+                  <article>
+                    <span>Losses</span>
+                    <strong>
+                      {gameStatistics.losses}
+                    </strong>
+                  </article>
+
+                  <article>
+                    <span>Win rate</span>
+                    <strong>
+                      {gameStatistics.winRate}%
+                    </strong>
+                  </article>
+                </div>
+
+                <div className="match-history">
+                  <h3>Recent matches</h3>
+
+                  {gameStatistics.history.length === 0 ? (
+                    <p>
+                      No recorded matches yet.
+                    </p>
+                  ) : (
+                    <ul>
+                      {gameStatistics.history.map(
+                        (match) => (
+                          <li key={match.id}>
+                            <span
+                              className={
+                                match.result === 'WIN'
+                                  ? 'match-result win'
+                                  : match.result ===
+                                      'LOSS'
+                                    ? 'match-result loss'
+                                    : 'match-result draw'
+                              }
+                            >
+                              {match.result}
+                            </span>
+
+                            <span>
+                              <strong>
+                                {match.userScore}
+                                {' - '}
+                                {match.opponentScore}
+                              </strong>
+
+                              <small>
+                                vs {match.opponent}
+                                {' · '}
+                                {match.mode}
+                              </small>
+                            </span>
+
+                            <time
+                              dateTime={
+                                match.finishedAt
+                              }
+                            >
+                              {new Date(
+                                match.finishedAt,
+                              ).toLocaleDateString()}
+                            </time>
+                          </li>
+                        ),
+                      )}
+                    </ul>
+                  )}
+                </div>
+              </>
+            ) : (
+              <p>
+                Statistics could not be loaded.
+              </p>
+            )}
+          </section>
+
+          <section
+            className="profile-statistics"
+            id="profile-statistics"
+          >
+            <div className="profile-statistics-header">
+              <div>
+                <p className="profile-statistics-label">
+                  GAME ACTIVITY
+                </p>
+                <h2>Match statistics</h2>
+                <p>
+                  Results from your recorded Pong matches.
+                </p>
+              </div>
+
+              {gameStatisticsLoading && (
+                <small>Loading statistics...</small>
+              )}
+            </div>
+
+            {gameStatisticsError && (
+              <p className="message error">
+                {gameStatisticsError}
+              </p>
+            )}
+
+            {!gameStatisticsLoading &&
+              !gameStatisticsError &&
+              gameStatistics && (
+                <>
+                  <div className="profile-stat-grid">
+                    <article>
+                      <span>Matches</span>
+                      <strong>
+                        {gameStatistics.total}
+                      </strong>
+                    </article>
+
+                    <article>
+                      <span>Wins</span>
+                      <strong>
+                        {gameStatistics.wins}
+                      </strong>
+                    </article>
+
+                    <article>
+                      <span>Losses</span>
+                      <strong>
+                        {gameStatistics.losses}
+                      </strong>
+                    </article>
+
+                    <article>
+                      <span>Win rate</span>
+                      <strong>
+                        {gameStatistics.winRate}%
+                      </strong>
+                    </article>
+                  </div>
+
+                  <div className="profile-forfeit-summary">
+                    <span>
+                      Forfeit wins:{' '}
+                      <strong>
+                        {gameStatistics.forfeitWins}
+                      </strong>
+                    </span>
+
+                    <span>
+                      Forfeit losses:{' '}
+                      <strong>
+                        {gameStatistics.forfeitLosses}
+                      </strong>
+                    </span>
+                  </div>
+
+                  <div className="match-history">
+                    <h3>Recent matches</h3>
+
+                    {gameStatistics.history.length === 0 ? (
+                      <p>
+                        No recorded matches yet. Complete an
+                        online match to populate your history.
+                      </p>
+                    ) : (
+                      <ul>
+                        {gameStatistics.history.map(
+                          (match) => {
+                            const currentUserIsPlayer1 =
+                              match.player1Id === user.id
+
+                            const opponent =
+                              currentUserIsPlayer1
+                                ? match.player2Username ??
+                                  'Computer'
+                                : match.player1Username
+
+                            const ownScore =
+                              currentUserIsPlayer1
+                                ? match.player1Score
+                                : match.player2Score
+
+                            const opponentScore =
+                              currentUserIsPlayer1
+                                ? match.player2Score
+                                : match.player1Score
+
+                            const won =
+                              match.winnerId === user.id
+
+                            return (
+                              <li key={match.id}>
+                                <div>
+                                  <strong>
+                                    {won ? 'Victory' : 'Defeat'}
+                                  </strong>
+                                  <small>
+                                    {match.mode} · vs {opponent}
+                                  </small>
+                                </div>
+
+                                <div className="match-history-result">
+                                  <strong>
+                                    {ownScore} - {opponentScore}
+                                  </strong>
+                                  <small>
+                                    {match.status === 'FORFEIT'
+                                      ? 'Forfeit'
+                                      : new Date(
+                                          match.finishedAt,
+                                        ).toLocaleString()}
+                                  </small>
+                                </div>
+                              </li>
+                            )
+                          },
+                        )}
+                      </ul>
+                    )}
+                  </div>
+                </>
+              )}
+          </section>
 
           <section className="control-settings">
             <div>

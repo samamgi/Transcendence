@@ -5,6 +5,7 @@ import { Server } from "socket.io";
 import { sessionMiddleware } from "../config/session.js";
 import { conversationService } from "../services/conversation.service.js";
 import { friendService } from "../services/friend.service.js";
+import { matchService } from "../services/match.service.js";
 
 type SessionRequest = {
 	session: Session &
@@ -136,6 +137,9 @@ type OnlineGameStateEvent = {
 
 type OnlineGame = {
 	roomId: string;
+	leftUserId: number;
+	rightUserId: number;
+	resultSaved: boolean;
 	leftPaddleY: number;
 	rightPaddleY: number;
 	ballX: number;
@@ -216,6 +220,39 @@ function emitOnlineGameState(
 		.emit("online:gameState", event);
 }
 
+function saveOnlineMatchResult(
+	game: OnlineGame,
+): void {
+	if (
+		!game.winner ||
+		game.resultSaved
+	) {
+		return;
+	}
+
+	game.resultSaved = true;
+
+	const winnerId =
+		game.winner === "left"
+			? game.leftUserId
+			: game.rightUserId;
+
+	void matchService
+		.createOnlineMatch({
+			leftPlayerId: game.leftUserId,
+			rightPlayerId: game.rightUserId,
+			winnerId,
+			leftScore: game.leftScore,
+			rightScore: game.rightScore,
+		})
+		.catch((error) => {
+			console.error(
+				"Unable to save online match:",
+				error,
+			);
+		});
+}
+
 function stopOnlineGame(roomId: string): void {
 	const game = onlineGames.get(roomId);
 
@@ -230,6 +267,8 @@ function stopOnlineGame(roomId: string): void {
 function createOnlineGame(
 	server: Server,
 	roomId: string,
+	leftUserId: number,
+	rightUserId: number,
 ): OnlineGame {
 	const initialPaddleY =
 		ONLINE_FIELD_HEIGHT / 2 -
@@ -237,6 +276,9 @@ function createOnlineGame(
 
 	const game: OnlineGame = {
 		roomId,
+		leftUserId,
+		rightUserId,
+		resultSaved: false,
 		leftPaddleY: initialPaddleY,
 		rightPaddleY: initialPaddleY,
 		ballX:
@@ -387,6 +429,7 @@ function createOnlineGame(
 				ONLINE_WINNING_SCORE
 			) {
 				game.winner = "right";
+				saveOnlineMatchResult(game);
 			} else {
 				resetOnlineBall(game, -1);
 			}
@@ -400,6 +443,7 @@ function createOnlineGame(
 				ONLINE_WINNING_SCORE
 			) {
 				game.winner = "left";
+				saveOnlineMatchResult(game);
 			} else {
 				resetOnlineBall(game, 1);
 			}
@@ -1074,6 +1118,8 @@ export function initializeSocket(
 					createOnlineGame(
 						io,
 						roomId,
+						opponentUserId,
+						userId,
 					);
 
 					const leftEvent:
