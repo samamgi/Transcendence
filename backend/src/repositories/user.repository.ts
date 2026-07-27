@@ -80,6 +80,121 @@ export class UserRepository {
 		});
 	}
 
+	async deleteAccount(userId: number) {
+		return prisma.$transaction(async (transaction) => {
+			const user = await transaction.user.findUnique({
+				where: {
+					id: userId,
+				},
+				select: {
+					id: true,
+					avatarUrl: true,
+					conversationParticipants: {
+						select: {
+							conversationId: true,
+							conversation: {
+								select: {
+									type: true,
+								},
+							},
+						},
+					},
+					ownedConversations: {
+						where: {
+							type: "GROUP",
+						},
+						select: {
+							id: true,
+							participants: {
+								where: {
+									userId: {
+										not: userId,
+									},
+								},
+								orderBy: {
+									joinedAt: "asc",
+								},
+								take: 1,
+								select: {
+									userId: true,
+								},
+							},
+						},
+					},
+				},
+			});
+
+			if (!user) {
+				return null;
+			}
+
+			const privateConversationIds =
+				user.conversationParticipants
+					.filter(
+						(participant) =>
+							participant.conversation.type ===
+							"PRIVATE",
+					)
+					.map(
+						(participant) =>
+							participant.conversationId,
+					);
+
+			if (privateConversationIds.length > 0) {
+				await transaction.conversation.deleteMany({
+					where: {
+						id: {
+							in: privateConversationIds,
+						},
+					},
+				});
+			}
+
+			for (
+				const conversation
+				of user.ownedConversations
+			) {
+				const nextOwnerId =
+					conversation.participants[0]?.userId;
+
+				if (nextOwnerId === undefined) {
+					await transaction.conversation.delete({
+						where: {
+							id: conversation.id,
+						},
+					});
+				} else {
+					await transaction.conversation.update({
+						where: {
+							id: conversation.id,
+						},
+						data: {
+							ownerId: nextOwnerId,
+						},
+					});
+				}
+			}
+
+			await transaction.user.delete({
+				where: {
+					id: userId,
+				},
+			});
+
+			await transaction.conversation.deleteMany({
+				where: {
+					participants: {
+						none: {},
+					},
+				},
+			});
+
+			return {
+				avatarUrl: user.avatarUrl,
+			};
+		});
+	}
+
 	async searchUsers(
 		userId: number,
 		query: string,

@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { friendService } from "../services/friend.service.js";
+import { getIO } from "../socket/index.js";
 
 export class FriendController {
 	async sendRequest(
@@ -14,6 +15,12 @@ export class FriendController {
 				senderId,
 				receiverId,
 			);
+
+		getIO()
+			.to(`user:${receiverId}`)
+			.emit("social:friendRequest", {
+				friendRequest,
+			});
 
 		response.status(201).json({
 			message: "Friend request sent",

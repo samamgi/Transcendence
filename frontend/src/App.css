@@ -14,7 +14,7 @@
 }
 
 .profile-card {
-  width: min(100%, 34rem);
+  width: min(100%, 72rem);
 }
 
 .card h1 {
@@ -308,4 +308,1918 @@ small {
   border: 1px solid #9ca3af;
   border-radius: 0.4rem;
   font: inherit;
+}
+
+
+/* Chat layout refresh */
+
+.chat-layout {
+  display: grid;
+  grid-template-columns: minmax(15rem, 19rem) minmax(0, 1fr);
+  gap: 1rem;
+  margin-top: 1.5rem;
+  min-height: 38rem;
+}
+
+.chat-layout > .social-section,
+.chat-panel > .social-section {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.chat-layout > .social-section {
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  background: #f9fafb;
+  overflow: hidden;
+}
+
+.chat-panel {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  background: white;
+}
+
+.empty-chat {
+  min-height: 34rem;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  color: #6b7280;
+}
+
+.empty-chat h2 {
+  color: #111827;
+}
+
+.conversation-list {
+  max-height: 32rem;
+  overflow-y: auto;
+}
+
+.conversation-list li {
+  min-width: 0;
+}
+
+.conversation-button {
+  min-width: 0;
+  border-color: transparent;
+  background: transparent;
+}
+
+.conversation-button:hover {
+  background: #e5e7eb;
+}
+
+.conversation-button.active {
+  border-color: #9ca3af;
+  background: white;
+}
+
+.conversation-button span:first-child {
+  min-width: 0;
+}
+
+.conversation-button small {
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-window {
+  height: 36rem;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+}
+
+.chat-window > h2 {
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.message-list {
+  max-height: none;
+  min-height: 0;
+  align-content: start;
+  padding: 1rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: #f3f4f6;
+}
+
+.chat-message {
+  width: fit-content;
+  max-width: min(75%, 34rem);
+  padding: 0.7rem 0.85rem;
+  border: 0;
+  border-radius: 0.9rem 0.9rem 0.9rem 0.25rem;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+}
+
+.chat-message.own-message {
+  justify-self: end;
+  border-radius: 0.9rem 0.9rem 0.25rem 0.9rem;
+  background: #dbeafe;
+}
+
+.chat-message > strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.chat-message small {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: 0.72rem;
+}
+
+.reply-reference {
+  margin: 0.4rem 0;
+  padding: 0.45rem 0.6rem;
+  border-left: 3px solid #6b7280;
+  border-radius: 0.3rem;
+  background: rgb(255 255 255 / 55%);
+}
+
+.reply-reference p {
+  margin-bottom: 0;
+  font-size: 0.85rem;
+}
+
+.message-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  margin-top: 0.4rem;
+}
+
+.message-reactions button,
+.reply-button,
+.edit-button,
+.delete-button {
+  min-height: auto;
+  padding: 0.2rem 0.4rem;
+  border-color: transparent;
+  background: transparent;
+  font-size: 0.75rem;
+}
+
+.message-reactions button:hover,
+.reply-button:hover,
+.edit-button:hover {
+  background: rgb(255 255 255 / 70%);
+}
+
+.delete-button {
+  color: #b91c1c;
+}
+
+.reaction-button.active {
+  border-color: #60a5fa;
+  background: #eff6ff;
+}
+
+.message-edit-form {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.message-edit-form textarea {
+  width: 100%;
+  min-width: 15rem;
+  resize: vertical;
+  padding: 0.5rem;
+  border: 1px solid #9ca3af;
+  border-radius: 0.4rem;
+  font: inherit;
+}
+
+.typing-indicator {
+  min-height: 1.25rem;
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+.message-form {
+  padding-top: 0.8rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.message-form label {
+  font-size: 0.85rem;
+}
+
+.message-form textarea {
+  min-height: 4rem;
+  max-height: 9rem;
+  resize: vertical;
+  background: #f9fafb;
+}
+
+.reply-composer-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0.75rem;
+  border-left: 3px solid #6b7280;
+  border-radius: 0.4rem;
+  background: #f3f4f6;
+}
+
+.reply-composer-preview p {
+  margin: 0.25rem 0 0;
+  color: #4b5563;
+}
+
+.reply-composer-preview button {
+  min-height: auto;
+}
+
+@media (max-width: 850px) {
+  .profile-card {
+    width: min(100%, 40rem);
+  }
+
+  .chat-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-window {
+    height: auto;
+    min-height: 36rem;
+  }
+
+  .message-list {
+    min-height: 24rem;
+    max-height: 32rem;
+  }
+
+  .chat-message {
+    max-width: 88%;
+  }
+}
+
+
+.main-navigation {
+  display: flex;
+  gap: 1rem;
+  margin: 2rem 0;
+}
+
+.main-navigation button {
+  flex: 1;
+}
+
+.main-navigation .active {
+  background: #111827;
+  color: white;
+}
+
+
+/* Application pages */
+
+.home-page,
+.play-page {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.hero-panel {
+  min-height: 22rem;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  padding: clamp(2rem, 6vw, 5rem);
+  border-radius: 1.25rem;
+  background:
+    radial-gradient(
+      circle at 80% 20%,
+      rgb(59 130 246 / 35%),
+      transparent 30%
+    ),
+    linear-gradient(135deg, #111827, #1e3a8a);
+  color: white;
+  overflow: hidden;
+}
+
+.eyebrow {
+  margin: 0 0 0.75rem;
+  color: #93c5fd;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+.hero-panel h2 {
+  display: grid;
+  margin: 0;
+  font-size: clamp(2.4rem, 7vw, 5rem);
+  line-height: 0.95;
+}
+
+.hero-panel h2 span {
+  color: #60a5fa;
+}
+
+.hero-description {
+  max-width: 34rem;
+  margin: 1.5rem 0;
+  color: #dbeafe;
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.hero-actions button {
+  min-width: 9rem;
+  border-color: rgb(255 255 255 / 25%);
+  background: rgb(255 255 255 / 10%);
+  color: white;
+}
+
+.hero-actions .primary-action {
+  border-color: #3b82f6;
+  background: #3b82f6;
+}
+
+.dashboard-grid,
+.game-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.dashboard-card,
+.game-mode-card {
+  padding: 1.25rem;
+  border: 1px solid #dbeafe;
+  border-radius: 1rem;
+  background: white;
+}
+
+.dashboard-card small,
+.game-mode-label {
+  color: #2563eb;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.dashboard-card strong {
+  display: block;
+  margin-top: 0.6rem;
+  font-size: 2rem;
+}
+
+.dashboard-card p,
+.game-mode-card p {
+  margin-bottom: 0;
+  color: #6b7280;
+}
+
+.play-header {
+  padding: 1rem 0;
+}
+
+.play-header h2 {
+  margin-top: 0.25rem;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+}
+
+.game-mode-card {
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+}
+
+.game-mode-card.featured {
+  border-color: #60a5fa;
+  box-shadow: 0 12px 30px rgb(37 99 235 / 12%);
+}
+
+.game-mode-card h3 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.game-mode-card button {
+  margin-top: auto;
+}
+
+.pong-stage-placeholder {
+  position: relative;
+  min-height: 24rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid #1e3a8a;
+  border-radius: 1.25rem;
+  background: #020617;
+  color: #93c5fd;
+  overflow: hidden;
+}
+
+.pong-stage-placeholder > p {
+  position: relative;
+  z-index: 2;
+  font-size: clamp(1.5rem, 5vw, 3rem);
+  font-weight: 900;
+  letter-spacing: 0.18em;
+}
+
+.pong-net {
+  position: absolute;
+  inset-block: 1.5rem;
+  left: 50%;
+  border-left: 3px dashed rgb(147 197 253 / 45%);
+}
+
+.pong-paddle {
+  position: absolute;
+  width: 0.65rem;
+  height: 5rem;
+  border-radius: 999px;
+  background: #dbeafe;
+}
+
+.pong-paddle.left {
+  left: 8%;
+  top: 28%;
+}
+
+.pong-paddle.right {
+  right: 8%;
+  bottom: 25%;
+}
+
+.pong-ball {
+  position: absolute;
+  top: 32%;
+  left: 60%;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  background: #60a5fa;
+  box-shadow: 0 0 1.5rem #3b82f6;
+}
+
+@media (max-width: 760px) {
+  .dashboard-grid,
+  .game-mode-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-panel {
+    min-height: 18rem;
+  }
+
+  .main-navigation {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+
+/* Gaming application shell */
+
+.app-page {
+  min-height: 100vh;
+  padding: 1.25rem;
+  background:
+    radial-gradient(
+      circle at 12% 5%,
+      rgb(37 99 235 / 18%),
+      transparent 28rem
+    ),
+    radial-gradient(
+      circle at 92% 85%,
+      rgb(124 58 237 / 14%),
+      transparent 30rem
+    ),
+    #070b16;
+  color: #e5e7eb;
+}
+
+.app-shell {
+  width: min(100%, 90rem);
+  min-height: calc(100vh - 2.5rem);
+  margin: 0 auto;
+  padding: 1.25rem;
+  border: 1px solid rgb(148 163 184 / 18%);
+  border-radius: 1.25rem;
+  background: rgb(15 23 42 / 88%);
+  box-shadow:
+    0 2rem 5rem rgb(0 0 0 / 35%),
+    inset 0 1px 0 rgb(255 255 255 / 4%);
+  backdrop-filter: blur(1rem);
+}
+
+.app-topbar {
+  min-height: 4.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 0 0.25rem 1rem;
+  border-bottom: 1px solid rgb(148 163 184 / 14%);
+}
+
+.brand-button {
+  min-height: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #f8fafc;
+  text-align: left;
+}
+
+.brand-button:hover {
+  transform: none;
+  background: transparent;
+}
+
+.brand-mark {
+  width: 2.8rem;
+  height: 2.8rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgb(96 165 250 / 55%);
+  border-radius: 0.8rem;
+  background:
+    linear-gradient(135deg, #2563eb, #7c3aed);
+  box-shadow: 0 0 1.5rem rgb(37 99 235 / 35%);
+  color: white;
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.brand-copy {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.brand-copy strong {
+  letter-spacing: 0.1em;
+}
+
+.brand-copy small {
+  color: #60a5fa;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+}
+
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.topbar-avatar {
+  width: 2.6rem;
+  height: 2.6rem;
+  flex: 0 0 2.6rem;
+  border: 2px solid rgb(96 165 250 / 55%);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.topbar-avatar-placeholder {
+  display: grid;
+  place-items: center;
+  background: #1e293b;
+  color: #bfdbfe;
+  font-weight: 800;
+}
+
+.topbar-avatar[hidden] {
+  display: none;
+}
+
+.topbar-identity {
+  display: grid;
+  min-width: 8rem;
+}
+
+.topbar-identity strong {
+  color: #f8fafc;
+}
+
+.topbar-identity small {
+  color: #94a3b8;
+}
+
+.topbar-logout {
+  min-height: 2.4rem;
+  padding: 0.45rem 0.8rem;
+  border-color: rgb(248 113 113 / 25%);
+  background: rgb(127 29 29 / 16%);
+  color: #fca5a5;
+}
+
+.main-navigation {
+  position: sticky;
+  top: 0.75rem;
+  z-index: 10;
+  display: flex;
+  gap: 0.45rem;
+  margin: 1rem 0 1.5rem;
+  padding: 0.4rem;
+  border: 1px solid rgb(148 163 184 / 14%);
+  border-radius: 0.9rem;
+  background: rgb(15 23 42 / 92%);
+  box-shadow: 0 0.75rem 2rem rgb(0 0 0 / 16%);
+  backdrop-filter: blur(1rem);
+}
+
+.main-navigation button {
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  flex: 1;
+  border-color: transparent;
+  background: transparent;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.main-navigation button:hover {
+  background: rgb(51 65 85 / 65%);
+  color: #e2e8f0;
+}
+
+.main-navigation .active {
+  border-color: rgb(96 165 250 / 30%);
+  background:
+    linear-gradient(
+      135deg,
+      rgb(37 99 235 / 90%),
+      rgb(79 70 229 / 90%)
+    );
+  box-shadow: 0 0.6rem 1.5rem rgb(37 99 235 / 20%);
+  color: white;
+}
+
+/* Shared dark components */
+
+.app-shell input,
+.app-shell textarea,
+.app-shell select {
+  border-color: rgb(148 163 184 / 28%);
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.app-shell input:focus,
+.app-shell textarea:focus,
+.app-shell select:focus {
+  border-color: #60a5fa;
+  outline: 2px solid rgb(59 130 246 / 16%);
+}
+
+.app-shell button {
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
+}
+
+.app-shell button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.app-shell form {
+  padding: 1.25rem;
+  border: 1px solid rgb(148 163 184 / 16%);
+  border-radius: 1rem;
+  background: rgb(30 41 59 / 50%);
+}
+
+.app-shell .profile-card form {
+  border-top: 0;
+}
+
+.app-shell small {
+  color: #94a3b8;
+}
+
+.app-shell h1,
+.app-shell h2,
+.app-shell h3,
+.app-shell strong {
+  color: #f8fafc;
+}
+
+.app-shell .dashboard-card,
+.app-shell .game-mode-card {
+  border-color: rgb(96 165 250 / 18%);
+  background:
+    linear-gradient(
+      145deg,
+      rgb(30 41 59 / 90%),
+      rgb(15 23 42 / 90%)
+    );
+  box-shadow: 0 1rem 2rem rgb(0 0 0 / 12%);
+}
+
+.app-shell .dashboard-card p,
+.app-shell .game-mode-card p {
+  color: #94a3b8;
+}
+
+.app-shell .hero-panel {
+  border: 1px solid rgb(96 165 250 / 24%);
+  box-shadow:
+    0 1.5rem 4rem rgb(0 0 0 / 22%),
+    inset 0 1px 0 rgb(255 255 255 / 5%);
+}
+
+.app-shell .social-section {
+  border-top-color: rgb(148 163 184 / 15%);
+}
+
+.app-shell .user-list li {
+  border-color: rgb(148 163 184 / 16%);
+  background: rgb(30 41 59 / 52%);
+}
+
+.app-shell .user-actions button,
+.app-shell .search-form button,
+.app-shell form > button {
+  border-color: rgb(96 165 250 / 30%);
+  background: rgb(37 99 235 / 18%);
+  color: #bfdbfe;
+}
+
+.app-shell .user-actions button:hover,
+.app-shell .search-form button:hover,
+.app-shell form > button:hover {
+  background: rgb(37 99 235 / 30%);
+}
+
+.app-shell .chat-layout > .social-section,
+.app-shell .chat-panel {
+  border-color: rgb(148 163 184 / 16%);
+  background: rgb(15 23 42 / 75%);
+}
+
+.app-shell .conversation-button {
+  color: #cbd5e1;
+}
+
+.app-shell .conversation-button:hover {
+  background: rgb(51 65 85 / 60%);
+}
+
+.app-shell .conversation-button.active {
+  border-color: rgb(96 165 250 / 35%);
+  background: rgb(37 99 235 / 18%);
+  color: white;
+}
+
+.app-shell .message-list {
+  background: #090f1d;
+}
+
+.app-shell .chat-message {
+  background: #1e293b;
+  color: #e2e8f0;
+  box-shadow: 0 0.4rem 1rem rgb(0 0 0 / 18%);
+}
+
+.app-shell .chat-message.own-message {
+  background:
+    linear-gradient(135deg, #1d4ed8, #4338ca);
+  color: white;
+}
+
+.app-shell .reply-reference {
+  background: rgb(15 23 42 / 52%);
+}
+
+.app-shell .message-form {
+  border-top-color: rgb(148 163 184 / 16%);
+  background: transparent;
+}
+
+.app-shell .empty-chat {
+  color: #64748b;
+}
+
+.app-shell .empty-chat h2 {
+  color: #e2e8f0;
+}
+
+.app-shell .error {
+  color: #fca5a5;
+}
+
+.app-shell .success {
+  color: #6ee7b7;
+}
+
+@media (max-width: 760px) {
+  .app-page {
+    padding: 0;
+  }
+
+  .app-shell {
+    min-height: 100vh;
+    padding: 0.85rem;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .app-topbar {
+    align-items: flex-start;
+  }
+
+  .brand-copy small,
+  .topbar-identity {
+    display: none;
+  }
+
+  .topbar-user {
+    margin-left: auto;
+  }
+
+  .main-navigation {
+    position: static;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Performance optimizations */
+
+.app-shell {
+  backdrop-filter: none;
+  box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 28%);
+}
+
+.main-navigation {
+  backdrop-filter: none;
+  box-shadow: 0 0.4rem 1rem rgb(0 0 0 / 18%);
+}
+
+.app-shell .hero-panel {
+  box-shadow: 0 1rem 2rem rgb(0 0 0 / 22%);
+}
+
+.app-shell .dashboard-card,
+.app-shell .game-mode-card {
+  box-shadow: 0 0.5rem 1rem rgb(0 0 0 / 12%);
+}
+
+.app-shell .chat-message {
+  box-shadow: 0 0.2rem 0.5rem rgb(0 0 0 / 16%);
+}
+
+.app-page {
+  background:
+    radial-gradient(
+      circle at 12% 5%,
+      rgb(37 99 235 / 12%),
+      transparent 24rem
+    ),
+    #070b16;
+}
+
+.app-shell button {
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.app-shell button:hover:not(:disabled) {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* Local Pong */
+
+.pong-game-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid rgb(96 165 250 / 18%);
+  border-radius: 1rem;
+  background: rgb(15 23 42 / 72%);
+}
+
+.pong-score {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.pong-score span {
+  color: #94a3b8;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.pong-score strong {
+  min-width: 2rem;
+  color: #f8fafc;
+  font-size: 2rem;
+  text-align: center;
+}
+
+.pong-score .score-divider {
+  color: #60a5fa;
+  font-size: 1.4rem;
+}
+
+.pong-game-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.pong-game-actions button {
+  border-color: rgb(96 165 250 / 32%);
+  background: rgb(37 99 235 / 18%);
+  color: #dbeafe;
+}
+
+.pong-game-viewport {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid rgb(96 165 250 / 22%);
+  border-radius: 1.2rem;
+  background: #020617;
+}
+
+.pong-game-field {
+  position: relative;
+  width: 100%;
+  max-height: 72vh;
+  margin: 0 auto;
+  overflow: hidden;
+  background:
+    linear-gradient(
+      rgb(30 41 59 / 16%) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgb(30 41 59 / 16%) 1px,
+      transparent 1px
+    ),
+    radial-gradient(
+      circle at center,
+      rgb(30 64 175 / 16%),
+      transparent 55%
+    ),
+    #020617;
+  background-size:
+    3rem 3rem,
+    3rem 3rem,
+    auto,
+    auto;
+}
+
+.pong-center-line {
+  position: absolute;
+  inset-block: 3%;
+  left: 50%;
+  border-left: 3px dashed rgb(148 163 184 / 34%);
+  transform: translateX(-50%);
+}
+
+.pong-game-paddle {
+  position: absolute;
+  width: 1.55%;
+  min-width: 7px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  box-shadow: 0 0 1rem rgb(96 165 250 / 45%);
+}
+
+.pong-game-paddle-left {
+  left: 2.7%;
+}
+
+.pong-game-paddle-right {
+  right: 2.7%;
+}
+
+.pong-game-ball {
+  position: absolute;
+  border-radius: 50%;
+  background: #60a5fa;
+  box-shadow:
+    0 0 0.8rem rgb(96 165 250 / 80%),
+    0 0 1.8rem rgb(37 99 235 / 55%);
+}
+
+.pong-game-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1rem;
+  background: rgb(2 6 23 / 54%);
+  text-align: center;
+}
+
+.pong-game-overlay strong {
+  font-size: clamp(1.4rem, 4vw, 2.5rem);
+  letter-spacing: 0.06em;
+}
+
+.pong-game-overlay button {
+  border-color: #60a5fa;
+  background: #2563eb;
+  color: white;
+}
+
+.pong-controls-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.pong-controls-grid article {
+  padding: 1rem;
+  border: 1px solid rgb(96 165 250 / 16%);
+  border-radius: 0.9rem;
+  background: rgb(30 41 59 / 48%);
+  text-align: center;
+}
+
+.pong-controls-grid span {
+  display: block;
+  color: #60a5fa;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.pong-controls-grid strong {
+  display: block;
+  margin: 0.4rem 0;
+  font-size: 1.4rem;
+}
+
+.pong-controls-grid p {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 720px) {
+  .pong-game-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pong-score {
+    justify-content: center;
+  }
+
+  .pong-game-actions {
+    justify-content: center;
+  }
+
+  .pong-controls-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Ergonomic fixes */
+
+/* Login / Register */
+
+.auth-card {
+  width: min(calc(100% - 2rem), 30rem);
+  border-color: rgb(96 165 250 / 22%);
+  background:
+    linear-gradient(
+      145deg,
+      rgb(30 41 59 / 96%),
+      rgb(15 23 42 / 98%)
+    );
+  box-shadow: 0 1.5rem 3rem rgb(0 0 0 / 32%);
+  color: #e2e8f0;
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.75rem;
+}
+
+.auth-brand h1 {
+  margin: 0;
+  color: #f8fafc;
+  letter-spacing: 0.04em;
+}
+
+.auth-brand p {
+  margin: 0.3rem 0 0;
+  color: #60a5fa;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.auth-card label {
+  color: #e2e8f0;
+}
+
+.auth-card input {
+  border-color: rgb(148 163 184 / 30%);
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.auth-card input:focus {
+  border-color: #60a5fa;
+  outline: 2px solid rgb(59 130 246 / 18%);
+}
+
+.auth-card .tabs button {
+  border-color: rgb(148 163 184 / 25%);
+  background: rgb(30 41 59 / 75%);
+  color: #cbd5e1;
+}
+
+.auth-card .tabs button.active {
+  border-color: rgb(96 165 250 / 45%);
+  background:
+    linear-gradient(135deg, #2563eb, #4f46e5);
+  color: white;
+}
+
+.auth-card form > button {
+  border-color: #3b82f6;
+  background:
+    linear-gradient(135deg, #2563eb, #4f46e5);
+  color: white;
+  font-weight: 700;
+}
+
+.auth-card small {
+  color: #94a3b8;
+}
+
+/* Search result Add button */
+
+.app-shell .user-list > li > button {
+  min-width: 5.5rem;
+  border-color: rgb(96 165 250 / 42%);
+  background:
+    linear-gradient(
+      135deg,
+      rgb(37 99 235 / 92%),
+      rgb(79 70 229 / 92%)
+    );
+  color: #fff;
+  font-weight: 700;
+}
+
+.app-shell .user-list > li > button:hover:not(:disabled) {
+  border-color: #93c5fd;
+  background:
+    linear-gradient(
+      135deg,
+      #3b82f6,
+      #6366f1
+    );
+}
+
+.app-shell .user-list > li > button:disabled {
+  border-color: rgb(148 163 184 / 18%);
+  background: rgb(51 65 85 / 65%);
+  color: #94a3b8;
+}
+
+/* Unread badge */
+
+.app-shell .unread-count {
+  background: #2563eb;
+  color: white;
+  box-shadow: 0 0 0.8rem rgb(37 99 235 / 35%);
+}
+
+
+/* Account danger zone */
+
+.danger-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid rgb(248 113 113 / 35%);
+  border-radius: 1rem;
+  background:
+    linear-gradient(
+      135deg,
+      rgb(127 29 29 / 22%),
+      rgb(69 10 10 / 14%)
+    );
+}
+
+.danger-zone-label {
+  margin: 0 0 0.4rem;
+  color: #f87171;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.danger-zone h2 {
+  margin: 0;
+  color: #fecaca;
+}
+
+.danger-zone p:not(.danger-zone-label) {
+  max-width: 38rem;
+  margin: 0.55rem 0 0;
+  color: #fca5a5;
+  line-height: 1.55;
+}
+
+.app-shell .delete-account-button {
+  flex: 0 0 auto;
+  border-color: rgb(248 113 113 / 48%);
+  background: #991b1b;
+  color: white;
+  font-weight: 700;
+}
+
+.app-shell .delete-account-button:hover:not(:disabled) {
+  border-color: #fca5a5;
+  background: #b91c1c;
+}
+
+@media (max-width: 680px) {
+  .danger-zone {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .delete-account-button {
+    width: 100%;
+  }
+}
+
+/* Pong game modes */
+
+.pong-mode-selector {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  padding: 0.4rem;
+  border: 1px solid rgb(96 165 250 / 18%);
+  border-radius: 0.9rem;
+  background: rgb(15 23 42 / 72%);
+}
+
+.pong-mode-selector button {
+  border-color: transparent;
+  background: transparent;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.pong-mode-selector button:hover {
+  background: rgb(51 65 85 / 60%);
+  color: #e2e8f0;
+}
+
+.pong-mode-selector button.active {
+  border-color: rgb(96 165 250 / 38%);
+  background:
+    linear-gradient(
+      135deg,
+      rgb(37 99 235 / 88%),
+      rgb(79 70 229 / 88%)
+    );
+  color: white;
+}
+
+@media (max-width: 560px) {
+  .pong-mode-selector {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Online Pong matchmaking */
+
+.pong-mode-selector {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.online-pong-panel {
+  min-height: 30rem;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  border: 1px solid rgb(96 165 250 / 24%);
+  border-radius: 1.2rem;
+  background:
+    radial-gradient(
+      circle at center,
+      rgb(37 99 235 / 16%),
+      transparent 55%
+    ),
+    #020617;
+  text-align: center;
+}
+
+.online-pong-panel h3 {
+  margin: 0;
+  font-size: clamp(1.8rem, 5vw, 3rem);
+}
+
+.online-pong-panel > p {
+  max-width: 34rem;
+  margin: 0;
+  color: #94a3b8;
+  line-height: 1.6;
+}
+
+.online-pong-panel button {
+  min-width: 10rem;
+  border-color: rgb(96 165 250 / 40%);
+  background: #1d4ed8;
+  color: white;
+  font-weight: 700;
+}
+
+.online-waiting-indicator {
+  width: 3rem;
+  height: 3rem;
+  border: 4px solid rgb(96 165 250 / 20%);
+  border-top-color: #60a5fa;
+  border-radius: 50%;
+  animation: online-waiting-spin 900ms linear infinite;
+}
+
+@keyframes online-waiting-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 650px) {
+  .pong-mode-selector {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Online Pong paddle synchronization */
+
+.online-paddle-test {
+  width: min(100%, 70rem);
+  display: grid;
+  gap: 1rem;
+}
+
+.online-match-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  text-align: left;
+}
+
+.online-match-heading h3 {
+  margin: 0;
+}
+
+.online-match-heading p {
+  margin: 0.35rem 0 0;
+  color: #94a3b8;
+}
+
+.online-paddle-field {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid rgb(96 165 250 / 28%);
+  border-radius: 1rem;
+  background:
+    linear-gradient(
+      rgb(30 41 59 / 14%) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgb(30 41 59 / 14%) 1px,
+      transparent 1px
+    ),
+    #020617;
+  background-size: 3rem 3rem;
+}
+
+@media (max-width: 650px) {
+  .online-match-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+/* Pong arena sizing */
+
+.pong-display-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.8rem;
+}
+
+.pong-display-actions small {
+  color: #94a3b8;
+}
+
+.app-shell .pong-expand-button {
+  min-height: 2.5rem;
+  padding: 0.45rem 0.9rem;
+  border-color: rgb(96 165 250 / 38%);
+  background: rgb(37 99 235 / 20%);
+  color: #dbeafe;
+  font-weight: 700;
+}
+
+.app-shell .pong-expand-button:hover:not(:disabled) {
+  background: rgb(37 99 235 / 34%);
+}
+
+/*
+ * Même format de terrain pour local, IA et online
+ * dans l’affichage normal.
+ */
+
+.pong-game-viewport,
+.online-paddle-test {
+  width: 100%;
+}
+
+.pong-game-field,
+.online-paddle-field {
+  width: min(100%, 72rem);
+  min-height: 0;
+  margin-inline: auto;
+  aspect-ratio: 900 / 500;
+}
+
+.online-pong-panel {
+  width: 100%;
+}
+
+.online-pong-panel:has(.online-paddle-test) {
+  min-height: auto;
+  display: block;
+  padding: 1.25rem;
+}
+
+.online-paddle-test {
+  max-width: none;
+  display: grid;
+  gap: 1rem;
+}
+
+.online-paddle-field {
+  position: relative;
+  overflow: hidden;
+}
+
+/*
+ * Arena agrandie dans l’application.
+ * Ce n’est pas le plein écran natif du navigateur.
+ */
+
+.play-page.arena-expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  grid-template-rows:
+    auto
+    auto
+    minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 1rem;
+  overflow: auto;
+  background:
+    radial-gradient(
+      circle at 50% 10%,
+      rgb(37 99 235 / 18%),
+      transparent 35rem
+    ),
+    #020617;
+  color: #e5e7eb;
+}
+
+.play-page.arena-expanded .play-header {
+  display: none;
+}
+
+.play-page.arena-expanded .pong-mode-selector {
+  display: none;
+}
+
+.play-page.arena-expanded .pong-display-actions {
+  grid-row: 1;
+  position: relative;
+  z-index: 5;
+  justify-content: flex-end;
+}
+
+.play-page.arena-expanded .pong-display-actions small {
+  display: none;
+}
+
+/* Local et IA */
+
+.play-page.arena-expanded
+  .pong-game-toolbar {
+  grid-row: 2;
+  position: relative;
+  z-index: 5;
+  margin: 0;
+}
+
+.play-page.arena-expanded
+  .pong-game-viewport {
+  grid-row: 3;
+  min-height: 0;
+  display: grid;
+  align-items: center;
+  overflow: visible;
+}
+
+.play-page.arena-expanded
+  .pong-game-field {
+  width: auto;
+  height: min(
+    calc(100vh - 11rem),
+    calc((100vw - 2rem) * 500 / 900)
+  );
+  max-width: 100%;
+  max-height: none;
+  margin: auto;
+}
+
+.play-page.arena-expanded
+  .pong-controls-grid {
+  display: none;
+}
+
+/* Online */
+
+.play-page.arena-expanded
+  .online-pong-panel {
+  grid-row: 2 / 4;
+  min-height: 0;
+  display: grid;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.play-page.arena-expanded
+  .online-paddle-test {
+  min-height: 0;
+  display: grid;
+  grid-template-rows:
+    auto
+    minmax(0, 1fr)
+    auto;
+}
+
+.play-page.arena-expanded
+  .online-match-heading {
+  position: relative;
+  z-index: 5;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgb(96 165 250 / 18%);
+  border-radius: 0.9rem;
+  background: rgb(15 23 42 / 88%);
+}
+
+.play-page.arena-expanded
+  .online-paddle-field {
+  width: auto;
+  height: min(
+    calc(100vh - 11rem),
+    calc((100vw - 2rem) * 500 / 900)
+  );
+  max-width: 100%;
+  margin: auto;
+}
+
+/*
+ * Empêche la barre score/commandes de passer derrière
+ * le terrain, y compris lorsque Firefox est mis en F11.
+ */
+
+.pong-game-toolbar,
+.online-match-heading {
+  isolation: isolate;
+}
+
+.pong-game-viewport,
+.online-paddle-field {
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 720px) {
+  .pong-display-actions {
+    align-items: flex-end;
+    flex-direction: column;
+  }
+
+  .play-page.arena-expanded {
+    padding: 0.65rem;
+  }
+
+  .play-page.arena-expanded
+    .pong-game-toolbar {
+    align-items: stretch;
+  }
+
+  .play-page.arena-expanded
+    .pong-game-field,
+  .play-page.arena-expanded
+    .online-paddle-field {
+    width: 100%;
+    height: auto;
+  }
+
+  .play-page.arena-expanded
+    .online-match-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+
+/* Keyboard control settings */
+
+.control-settings {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid rgb(96 165 250 / 22%);
+  border-radius: 1rem;
+  background:
+    linear-gradient(
+      135deg,
+      rgb(30 64 175 / 16%),
+      rgb(15 23 42 / 54%)
+    );
+}
+
+.control-settings-label {
+  margin: 0 0 0.4rem;
+  color: #60a5fa;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.control-settings h2 {
+  margin: 0;
+}
+
+.control-settings p:not(.control-settings-label) {
+  max-width: 38rem;
+  margin: 0.55rem 0 0;
+  color: #94a3b8;
+  line-height: 1.55;
+}
+
+.control-scheme-selector {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(8rem, 1fr));
+  gap: 0.6rem;
+}
+
+.app-shell .control-scheme-selector button {
+  min-width: 8rem;
+  display: grid;
+  gap: 0.25rem;
+  border-color: rgb(148 163 184 / 24%);
+  background: rgb(15 23 42 / 76%);
+  color: #94a3b8;
+}
+
+.control-scheme-selector button strong {
+  color: inherit;
+}
+
+.control-scheme-selector button span {
+  font-size: 0.85rem;
+}
+
+.app-shell .control-scheme-selector button.active {
+  border-color: rgb(96 165 250 / 55%);
+  background:
+    linear-gradient(
+      135deg,
+      rgb(37 99 235 / 88%),
+      rgb(79 70 229 / 88%)
+    );
+  color: white;
+}
+
+@media (max-width: 720px) {
+  .control-settings {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .control-scheme-selector {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 440px) {
+  .control-scheme-selector {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Rendering performance */
+
+/*
+ * Les mouvements de la balle et des raquettes ne doivent
+ * pas provoquer le recalcul de toute la page.
+ */
+
+.pong-game-viewport,
+.pong-game-field,
+.online-pong-panel,
+.online-paddle-field {
+  contain: layout paint;
+}
+
+.pong-game-field,
+.online-paddle-field {
+  isolation: isolate;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.pong-game-paddle,
+.pong-game-ball {
+  will-change: top, left;
+  backface-visibility: hidden;
+}
+
+/*
+ * Les grands glows sur des objets animés coûtent cher,
+ * particulièrement sous Firefox.
+ */
+
+.pong-game-paddle {
+  box-shadow: 0 0 0.45rem rgb(96 165 250 / 32%);
+}
+
+.pong-game-ball {
+  box-shadow: 0 0 0.65rem rgb(96 165 250 / 55%);
+}
+
+/*
+ * Fond de terrain plus léger : même rendu général,
+ * moins de couches repeintes à chaque frame.
+ */
+
+.pong-game-field,
+.online-paddle-field {
+  background:
+    linear-gradient(
+      rgb(30 41 59 / 12%) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgb(30 41 59 / 12%) 1px,
+      transparent 1px
+    ),
+    #020617;
+  background-size: 3rem 3rem;
+}
+
+/*
+ * Réduction des effets coûteux pendant le scroll.
+ */
+
+.app-page {
+  background:
+    radial-gradient(
+      circle at 12% 5%,
+      rgb(37 99 235 / 9%),
+      transparent 22rem
+    ),
+    #070b16;
+}
+
+.app-shell {
+  box-shadow: 0 0.75rem 1.8rem rgb(0 0 0 / 22%);
+}
+
+.hero-panel,
+.dashboard-card,
+.game-mode-card,
+.chat-message {
+  box-shadow: none;
+}
+
+/*
+ * Le navigateur peut isoler les grandes catégories qui
+ * ne sont pas actuellement visibles.
+ */
+
+.social-section,
+.control-settings,
+.danger-zone,
+.dashboard-card,
+.game-mode-card {
+  contain: layout paint style;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .online-waiting-indicator {
+    animation: none;
+  }
+}
+
+
+/* Social notification indicator */
+
+.main-navigation button {
+  position: relative;
+}
+
+.social-notification-dot {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.7rem;
+  width: 0.62rem;
+  height: 0.62rem;
+  border: 2px solid #0f172a;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 0.55rem rgb(239 68 68 / 55%);
+  pointer-events: none;
+}
+
+.main-navigation button.active
+  .social-notification-dot {
+  border-color: #1d4ed8;
+}
+
+@media (max-width: 760px) {
+  .social-notification-dot {
+    top: 0.45rem;
+    right: 0.55rem;
+  }
 }

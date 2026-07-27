@@ -485,6 +485,8 @@ export class ConversationService {
 				updatedAt: conversation.updatedAt,
 				lastMessage: conversation.messages[0] ?? null,
 				unreadCount: conversation.unreadCount,
+				reactionUnreadCount:
+					conversation.reactionUnreadCount,
 			};
 
 			if (conversation.type === "GROUP") {
@@ -509,6 +511,13 @@ export class ConversationService {
 			return {
 				...commonData,
 				otherUser: otherParticipant?.user ?? null,
+				participants:
+					conversation.participants.map(
+						(participant) => ({
+							userId: participant.userId,
+							user: participant.user,
+						}),
+					),
 			};
 		});
 	}
@@ -772,6 +781,7 @@ export class ConversationService {
 		return {
 			...reaction,
 			conversationId: message.conversationId,
+			messageSenderId: message.senderId,
 		};
 	}
 
@@ -1051,6 +1061,15 @@ export class ConversationService {
 	}
 
 
+
+	async getParticipantUserIds(
+		conversationId: number,
+	) {
+		return conversationRepository
+			.getParticipantUserIds(
+				conversationId,
+			);
+	}
 
 	async ensureParticipant(
 		conversationId: number,

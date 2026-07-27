@@ -18,7 +18,18 @@ export class ConversationRepository {
 					},
 				},
 				include: {
-					participants: true,
+					participants: {
+						include: {
+							user: {
+								select: {
+									id: true,
+									username: true,
+									displayName: true,
+									avatarUrl: true,
+								},
+							},
+						},
+					},
 				},
 			});
 
@@ -47,7 +58,18 @@ export class ConversationRepository {
 				},
 			},
 			include: {
-				participants: true,
+				participants: {
+					include: {
+						user: {
+							select: {
+								id: true,
+								username: true,
+								displayName: true,
+								avatarUrl: true,
+							},
+						},
+					},
+				},
 			},
 		});
 	}
@@ -410,15 +432,96 @@ export class ConversationRepository {
 				]),
 			);
 
+		const unseenReactions =
+			await prisma.messageReaction.findMany({
+				where: {
+					OR: conversations.map(
+						(conversation) => {
+							const currentParticipant =
+								conversation.participants.find(
+									(participant) =>
+										participant.userId === userId,
+								);
+
+							const lastSeenReactionAt =
+								currentParticipant
+									?.lastSeenReactionAt;
+
+							return {
+								userId: {
+									not: userId,
+								},
+								message: {
+									senderId: userId,
+									conversationId:
+										conversation.id,
+								},
+								...(lastSeenReactionAt
+									? {
+										createdAt: {
+											gt: lastSeenReactionAt,
+										},
+									}
+									: {}),
+							};
+						},
+					),
+				},
+				select: {
+					message: {
+						select: {
+							conversationId: true,
+						},
+					},
+				},
+			});
+
+		const reactionCountByConversation =
+			new Map<number, number>();
+
+		for (const reaction of unseenReactions) {
+			const conversationId =
+				reaction.message.conversationId;
+
+			reactionCountByConversation.set(
+				conversationId,
+				(reactionCountByConversation.get(
+					conversationId,
+				) ?? 0) + 1,
+			);
+		}
+
 		return conversations.map((conversation) => ({
 			...conversation,
 			unreadCount:
 				unreadCountByConversation.get(
 					conversation.id,
 				) ?? 0,
+			reactionUnreadCount:
+				reactionCountByConversation.get(
+					conversation.id,
+				) ?? 0,
 		}));
 	}
 
+
+	async getParticipantUserIds(
+		conversationId: number,
+	) {
+		const participants =
+			await prisma.conversationParticipant.findMany({
+				where: {
+					conversationId,
+				},
+				select: {
+					userId: true,
+				},
+			});
+
+		return participants.map(
+			(participant) => participant.userId,
+		);
+	}
 
 	async isParticipant(
 		conversationId: number,
@@ -625,6 +728,7 @@ export class ConversationRepository {
 			},
 			data: {
 				lastReadMessageId: messageId,
+				lastSeenReactionAt: new Date(),
 			},
 		});
 	}

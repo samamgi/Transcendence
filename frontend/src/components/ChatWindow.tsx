@@ -4,6 +4,7 @@ import {
   useState,
   type ChangeEvent,
   type FormEvent,
+  type KeyboardEvent,
 } from 'react'
 import type { Socket } from 'socket.io-client'
 import type { Conversation } from './ConversationList'
@@ -23,6 +24,7 @@ type MessageReaction = {
   createdAt: string
   user: MessageUser
   conversationId: number
+  messageSenderId?: number
 }
 
 type RemovedReaction = {
@@ -194,6 +196,9 @@ export default function ChatWindow({
 
   const typingTimeoutRef =
     useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const messagesEndRef =
+    useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -519,6 +524,14 @@ export default function ChatWindow({
     socket,
   ])
 
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: 'smooth',
+    })
+  }, [messages])
+
+
   function setReactionPending(
     messageId: number,
     pending: boolean,
@@ -791,6 +804,26 @@ export default function ChatWindow({
     }, 1200)
   }
 
+  function handleMessageKeyDown(
+    event: KeyboardEvent<HTMLTextAreaElement>,
+  ): void {
+    if (
+      event.key !== 'Enter' ||
+      event.shiftKey ||
+      event.nativeEvent.isComposing
+    ) {
+      return
+    }
+
+    event.preventDefault()
+
+    if (!content.trim() || sending) {
+      return
+    }
+
+    event.currentTarget.form?.requestSubmit()
+  }
+
   function handleSubmit(
     event: FormEvent<HTMLFormElement>,
   ): void {
@@ -1052,6 +1085,7 @@ export default function ChatWindow({
             )
           })
         )}
+        <div ref={messagesEndRef} />
       </div>
 
       <p className="typing-indicator">
@@ -1095,6 +1129,7 @@ export default function ChatWindow({
             rows={3}
             required
             onChange={handleContentChange}
+            onKeyDown={handleMessageKeyDown}
           />
         </label>
 

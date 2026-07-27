@@ -21,6 +21,16 @@ router.get(
 	asyncHandler(authController.me.bind(authController)),
 );
 
+router.delete(
+	"/account",
+	requireAuth,
+	asyncHandler(
+		authController.deleteAccount.bind(
+			authController,
+		),
+	),
+);
+
 router.post(
 	"/logout",
 	requireAuth,

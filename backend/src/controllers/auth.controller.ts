@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { authService } from "../services/auth.service.js";
+import { userService } from "../services/user.service.js";
 
 const COOKIE_NAME = "transcendence.sid";
 
@@ -92,6 +93,41 @@ export class AuthController {
 
 				next(error);
 			});
+		}
+	}
+
+	async deleteAccount(
+		request: Request,
+		response: Response,
+		next: NextFunction,
+	) {
+		try {
+			const userId =
+				request.session.userId as number;
+
+			await userService.deleteAccount(userId);
+
+			request.session.destroy((error) => {
+				if (error) {
+					next(error);
+					return;
+				}
+
+				response.clearCookie(COOKIE_NAME, {
+					httpOnly: true,
+					secure:
+						process.env.NODE_ENV ===
+						"production",
+					sameSite: "lax",
+				});
+
+				response.status(200).json({
+					message:
+						"Account permanently deleted",
+				});
+			});
+		} catch (error) {
+			next(error);
 		}
 	}
 

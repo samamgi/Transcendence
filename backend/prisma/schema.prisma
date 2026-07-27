@@ -108,8 +108,9 @@ model Conversation {
 model ConversationParticipant {
   conversationId    Int
   userId            Int
-  lastReadMessageId Int?
-  joinedAt          DateTime @default(now())
+  lastReadMessageId  Int?
+  lastSeenReactionAt DateTime?
+  joinedAt           DateTime @default(now())
 
   conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)

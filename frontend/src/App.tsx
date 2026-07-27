@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -7,6 +8,8 @@ import {
 } from 'react'
 import { io, type Socket } from 'socket.io-client'
 import ChatWindow from './components/ChatWindow'
+import HomePage from './pages/HomePage'
+import PlayPage from './pages/PlayPage'
 import ConversationList, {
   type Conversation,
 } from './components/ConversationList'
@@ -60,12 +63,52 @@ type PresenceEvent = {
   userId: number
 }
 
+type ReactionNotificationEvent = {
+  messageId: number
+  conversationId: number
+  messageSenderId?: number
+  userId: number
+  emoji: string
+  user: {
+    id: number
+    username: string
+    displayName: string | null
+  }
+}
+
 type ConversationResponse = {
   conversation?: Conversation
   error?: string
 }
 
+type SocialConversationSummary = {
+  id: number
+  unreadCount?: number
+  reactionUnreadCount?: number
+}
+
+type SocialConversationsResponse = {
+  conversations?: SocialConversationSummary[]
+  error?: string
+}
+
+type SocialRealtimeMessage = {
+  id: number
+  conversationId: number
+  senderId: number
+}
+
 type AuthMode = 'login' | 'register'
+
+type Page =
+  | 'home'
+  | 'play'
+  | 'social'
+  | 'profile'
+
+type ControlScheme =
+  | 'qwerty'
+  | 'azerty'
 
 async function requestJson(
   url: string,
@@ -139,9 +182,33 @@ function App() {
   const [submitting, setSubmitting] = useState(false)
   const [profileSubmitting, setProfileSubmitting] = useState(false)
   const [avatarSubmitting, setAvatarSubmitting] = useState(false)
+  const [accountDeleting, setAccountDeleting] =
+    useState(false)
 
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+
+  useEffect(() => {
+    if (!success) {
+      return
+    }
+
+    if (successTimeoutRef.current !== null) {
+      clearTimeout(successTimeoutRef.current)
+    }
+
+    successTimeoutRef.current =
+      window.setTimeout(() => {
+        setSuccess('')
+        successTimeoutRef.current = null
+      }, 3000)
+
+    return () => {
+      if (successTimeoutRef.current !== null) {
+        clearTimeout(successTimeoutRef.current)
+      }
+    }
+  }, [success])
 
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] =
@@ -158,6 +225,12 @@ function App() {
 
   const socketRef = useRef<Socket | null>(null)
 
+  const successTimeoutRef =
+    useRef<number | null>(null)
+
+  const notificationTimeoutRef =
+    useRef<number | null>(null)
+
   const [socket, setSocket] =
     useState<Socket | null>(null)
 
@@ -167,44 +240,133 @@ function App() {
   const [conversationRefreshKey, setConversationRefreshKey] =
     useState(0)
 
+
+  const [page, setPage] =
+    useState<Page>('home')
+
+  const pageRef = useRef<Page>('home')
+
+  const [
+    socialUnreadMessageCount,
+    setSocialUnreadMessageCount,
+  ] = useState(0)
+
+  const [
+    hasUnseenSocialReaction,
+    setHasUnseenSocialReaction,
+  ] = useState(false)
+
+  const hasSocialNotification =
+    friendRequests.length > 0 ||
+    socialUnreadMessageCount > 0 ||
+    hasUnseenSocialReaction
+
+  const [controlScheme, setControlScheme] =
+    useState<ControlScheme>(() =>
+      window.localStorage.getItem(
+        'pong-control-scheme',
+      ) === 'azerty'
+        ? 'azerty'
+        : 'qwerty',
+    )
+
+  useEffect(() => {
+    pageRef.current = page
+  }, [page])
+
+  function openSocialPage(): void {
+    pageRef.current = 'social'
+    setHasUnseenSocialReaction(false)
+    setPage('social')
+  }
+
   function applyUser(nextUser: User): void {
+    setPage('home')
     setUser(nextUser)
     setProfileUsername(nextUser.username)
     setDisplayName(nextUser.displayName ?? '')
   }
 
-  function refreshOnlineFriends(): void {
-    const socket = socketRef.current
+  async function refreshSocialUnreadMessages(
+    activeSocket?: Socket,
+  ): Promise<void> {
+    try {
+      const response = await fetch(
+        '/api/conversations',
+        {
+          credentials: 'include',
+        },
+      )
 
-    if (!socket?.connected) {
-      return
-    }
+      const payload =
+        (await response.json()) as
+          SocialConversationsResponse
 
-    socket.emit(
-      'getOnlineFriends',
-      (response: OnlineFriendsResponse) => {
-        if (!response.success) {
-          return
+      if (!response.ok) {
+        return
+      }
+
+      const conversations =
+        payload.conversations ?? []
+
+      setSocialUnreadMessageCount(
+        conversations.reduce(
+          (total, conversation) =>
+            total +
+            (conversation.unreadCount ?? 0) +
+            (conversation.reactionUnreadCount ?? 0),
+          0,
+        ),
+      )
+
+      if (activeSocket?.connected) {
+        for (const conversation of conversations) {
+          activeSocket.emit(
+            'joinConversation',
+            conversation.id,
+            () => undefined,
+          )
         }
-
-        setOnlineFriendIds(
-          new Set(response.userIds ?? []),
-        )
-      },
-    )
+      }
+    } catch {
+      // La page Social chargera de nouveau les données.
+    }
   }
 
-  async function refreshFriendsData(): Promise<void> {
-    const [loadedFriends, loadedRequests] =
-      await Promise.all([
-        loadFriends(),
-        loadRequests(),
-      ])
+  const refreshOnlineFriends =
+    useCallback((): void => {
+      const socket = socketRef.current
 
-    setFriends(loadedFriends.friends)
-    setFriendRequests(loadedRequests.requests)
-    refreshOnlineFriends()
-  }
+      if (!socket?.connected) {
+        return
+      }
+
+      socket.emit(
+        'getOnlineFriends',
+        (response: OnlineFriendsResponse) => {
+          if (!response.success) {
+            return
+          }
+
+          setOnlineFriendIds(
+            new Set(response.userIds ?? []),
+          )
+        },
+      )
+    }, [])
+
+  const refreshFriendsData =
+    useCallback(async (): Promise<void> => {
+      const [loadedFriends, loadedRequests] =
+        await Promise.all([
+          loadFriends(),
+          loadRequests(),
+        ])
+
+      setFriends(loadedFriends.friends)
+      setFriendRequests(loadedRequests.requests)
+      refreshOnlineFriends()
+    }, [refreshOnlineFriends])
 
   useEffect(() => {
     async function restoreSession(): Promise<void> {
@@ -254,6 +416,10 @@ function App() {
     const handleConnect = (): void => {
       setSocket(activeSocket)
       refreshOnlineFriends()
+
+      void refreshSocialUnreadMessages(
+        activeSocket,
+      )
     }
 
     const handleDisconnect = (): void => {
@@ -284,23 +450,120 @@ function App() {
       })
     }
 
+    const handleSocialMessage = (
+      message: SocialRealtimeMessage,
+    ): void => {
+      if (
+        message.senderId === user.id ||
+        pageRef.current === 'social'
+      ) {
+        return
+      }
+
+      setSocialUnreadMessageCount(
+        (currentCount) => currentCount + 1,
+      )
+    }
+
+    const handleRealtimeFriendRequest =
+      (): void => {
+        void refreshFriendsData()
+      }
+
+    const handleReactionNotification = (
+      reaction: ReactionNotificationEvent,
+    ): void => {
+      const reactedToCurrentUsersMessage =
+        reaction.messageSenderId === user.id
+
+      const wasAddedByAnotherUser =
+        reaction.userId !== user.id
+
+      if (
+        !reactedToCurrentUsersMessage ||
+        !wasAddedByAnotherUser
+      ) {
+        return
+      }
+
+      if (pageRef.current !== 'social') {
+        setHasUnseenSocialReaction(true)
+      }
+
+      const reactionAuthor =
+        reaction.user.displayName ??
+        reaction.user.username
+
+      setSuccess(
+        `${reactionAuthor} reacted ${reaction.emoji} to your message`,
+      )
+
+      if (notificationTimeoutRef.current !== null) {
+        window.clearTimeout(
+          notificationTimeoutRef.current,
+        )
+      }
+
+      notificationTimeoutRef.current =
+        window.setTimeout(() => {
+          setSuccess('')
+          notificationTimeoutRef.current = null
+        }, 4000)
+    }
+
     activeSocket.on('connect', handleConnect)
     activeSocket.on('disconnect', handleDisconnect)
     activeSocket.on('userOnline', handleOnline)
     activeSocket.on('userOffline', handleOffline)
+    activeSocket.on(
+      'social:newMessage',
+      handleSocialMessage,
+    )
+    activeSocket.on(
+      'social:reaction',
+      handleReactionNotification,
+    )
+    activeSocket.on(
+      'social:friendRequest',
+      handleRealtimeFriendRequest,
+    )
 
     return () => {
       activeSocket.off('connect', handleConnect)
       activeSocket.off('disconnect', handleDisconnect)
       activeSocket.off('userOnline', handleOnline)
       activeSocket.off('userOffline', handleOffline)
+      activeSocket.off(
+        'social:newMessage',
+        handleSocialMessage,
+      )
+      activeSocket.off(
+        'social:reaction',
+        handleReactionNotification,
+      )
+      activeSocket.off(
+        'social:friendRequest',
+        handleRealtimeFriendRequest,
+      )
+
+      if (notificationTimeoutRef.current !== null) {
+        window.clearTimeout(
+          notificationTimeoutRef.current,
+        )
+        notificationTimeoutRef.current = null
+      }
+
       activeSocket.disconnect()
 
       if (socketRef.current === activeSocket) {
         socketRef.current = null
       }
     }
-  }, [user])
+  }, [
+    user,
+    refreshFriendsData,
+    refreshOnlineFriends,
+  ])
 
   async function handleAuthentication(
     event: FormEvent<HTMLFormElement>,
@@ -602,6 +865,61 @@ function App() {
     }
   }
 
+  async function handleDeleteAccount(): Promise<void> {
+    const confirmation = window.prompt(
+      'This action is permanent. Type DELETE to confirm.',
+    )
+
+    if (confirmation !== 'DELETE') {
+      return
+    }
+
+    const finalConfirmation = window.confirm(
+      'Permanently delete your account and all associated data?',
+    )
+
+    if (!finalConfirmation) {
+      return
+    }
+
+    setError('')
+    setSuccess('')
+    setAccountDeleting(true)
+
+    try {
+      await requestJson('/api/auth/account', {
+        method: 'DELETE',
+      })
+
+      socketRef.current?.disconnect()
+      socketRef.current = null
+
+      setSocket(null)
+      setUser(null)
+      setPassword('')
+      setAvatarFile(null)
+      setSearchQuery('')
+      setSearchResults([])
+      setFriends([])
+      setFriendRequests([])
+      setOnlineFriendIds(new Set())
+      setSocialUnreadMessageCount(0)
+      setHasUnseenSocialReaction(false)
+      setSelectedConversation(null)
+      setConversationRefreshKey(0)
+      setPage('home')
+      setMode('login')
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Unable to delete account',
+      )
+    } finally {
+      setAccountDeleting(false)
+    }
+  }
+
   async function handleLogout(): Promise<void> {
     setError('')
     setSuccess('')
@@ -619,8 +937,11 @@ function App() {
       setFriends([])
       setFriendRequests([])
       setOnlineFriendIds(new Set())
+      setSocialUnreadMessageCount(0)
+      setHasUnseenSocialReaction(false)
       setSelectedConversation(null)
       setConversationRefreshKey(0)
+      setPage('home')
     } catch (caughtError) {
       setError(
         caughtError instanceof Error
@@ -628,6 +949,23 @@ function App() {
           : 'Logout failed',
       )
     }
+  }
+
+  function changeControlScheme(
+    nextScheme: ControlScheme,
+  ): void {
+    setControlScheme(nextScheme)
+
+    window.localStorage.setItem(
+      'pong-control-scheme',
+      nextScheme,
+    )
+
+    setSuccess(
+      nextScheme === 'azerty'
+        ? 'AZERTY controls selected'
+        : 'QWERTY controls selected',
+    )
   }
 
   function changeMode(nextMode: AuthMode): void {
@@ -653,46 +991,135 @@ function App() {
 
   if (user) {
     return (
-      <main className="page">
-        <section className="card profile-card">
-          <header className="profile-header">
-            {user.avatarUrl ? (
-              <img
-                className="avatar"
-                src={user.avatarUrl}
-                alt=""
-                onError={(event) => {
-                  event.currentTarget.hidden = true
-
-                  const fallback =
-                    event.currentTarget
-                      .nextElementSibling as HTMLElement | null
-
-                  if (fallback) {
-                    fallback.hidden = false
-                  }
-                }}
-              />
-            ) : null}
-
-            <div
-              className="avatar avatar-placeholder"
-              hidden={Boolean(user.avatarUrl)}
-              aria-label={`${user.username}'s avatar`}
+      <main className="app-page">
+        <section className="app-shell">
+          <header className="app-topbar">
+            <button
+              type="button"
+              className="brand-button"
+              onClick={() => setPage('home')}
             >
-              {user.username.charAt(0).toUpperCase()}
-            </div>
+              <span className="brand-mark">T</span>
 
-            <div>
-              <h1>Transcendence</h1>
-              <p>
-                Connected as <strong>{user.username}</strong>
-              </p>
-              <p>{user.email}</p>
+              <span className="brand-copy">
+                <strong>TRANSCENDENCE</strong>
+                <small>ONLINE PONG ARENA</small>
+              </span>
+            </button>
+
+            <div className="topbar-user">
+              {user.avatarUrl ? (
+                <img
+                  className="topbar-avatar"
+                  src={user.avatarUrl}
+                  alt=""
+                  onError={(event) => {
+                    event.currentTarget.hidden = true
+
+                    const fallback =
+                      event.currentTarget
+                        .nextElementSibling as HTMLElement | null
+
+                    if (fallback) {
+                      fallback.hidden = false
+                    }
+                  }}
+                />
+              ) : null}
+
+              <div
+                className="topbar-avatar topbar-avatar-placeholder"
+                hidden={Boolean(user.avatarUrl)}
+                aria-label={`${user.username}'s avatar`}
+              >
+                {user.username.charAt(0).toUpperCase()}
+              </div>
+
+              <div className="topbar-identity">
+                <strong>
+                  {user.displayName ?? user.username}
+                </strong>
+                <small>@{user.username}</small>
+              </div>
+
+              <button
+                type="button"
+                className="topbar-logout"
+                onClick={() => void handleLogout()}
+              >
+                Log out
+              </button>
             </div>
           </header>
 
-          <form onSubmit={(event) => void handleProfileUpdate(event)}>
+          <nav className="main-navigation">
+            <button
+              type="button"
+              className={page === 'home' ? 'active' : ''}
+              onClick={() => setPage('home')}
+            >
+              <span aria-hidden="true">⌂</span>
+              Home
+            </button>
+
+            <button
+              type="button"
+              className={page === 'play' ? 'active' : ''}
+              onClick={() => setPage('play')}
+            >
+              <span aria-hidden="true">▶</span>
+              Play
+            </button>
+
+            <button
+              type="button"
+              className={page === 'social' ? 'active' : ''}
+              onClick={openSocialPage}
+            >
+              <span aria-hidden="true">●</span>
+              Social
+
+              {hasSocialNotification && (
+                <span
+                  className="social-notification-dot"
+                  aria-label="Unseen social notifications"
+                />
+              )}
+            </button>
+
+            <button
+              type="button"
+              className={page === 'profile' ? 'active' : ''}
+              onClick={() => setPage('profile')}
+            >
+              <span aria-hidden="true">◆</span>
+              Profile
+            </button>
+          </nav>
+
+          {page === 'home' && (
+            <HomePage
+              username={user.displayName ?? user.username}
+              onlineFriendsCount={onlineFriendIds.size}
+              onPlay={() => setPage('play')}
+              onSocial={openSocialPage}
+            />
+          )}
+
+          {page === 'play' && (
+            <PlayPage
+              socket={socket}
+              controlScheme={controlScheme}
+            />
+          )}
+
+          {page === 'profile' && (
+            <>
+              <form
+                onSubmit={(event) =>
+                  void handleProfileUpdate(event)
+                }
+              >
             <h2>Profile</h2>
 
             <label>
@@ -747,8 +1174,92 @@ function App() {
             </button>
           </form>
 
-          <section className="social-section">
-            <h2>Search users</h2>
+          <section className="control-settings">
+            <div>
+              <p className="control-settings-label">
+                GAME CONTROLS
+              </p>
+
+              <h2>Keyboard layout</h2>
+
+              <p>
+                Choose the movement keys matching your
+                keyboard. Arrow keys remain available
+                against the AI and in online matches.
+              </p>
+            </div>
+
+            <div
+              className="control-scheme-selector"
+              aria-label="Keyboard layout"
+            >
+              <button
+                type="button"
+                className={
+                  controlScheme === 'qwerty'
+                    ? 'active'
+                    : ''
+                }
+                onClick={() =>
+                  changeControlScheme('qwerty')
+                }
+              >
+                <strong>QWERTY</strong>
+                <span>W / S</span>
+              </button>
+
+              <button
+                type="button"
+                className={
+                  controlScheme === 'azerty'
+                    ? 'active'
+                    : ''
+                }
+                onClick={() =>
+                  changeControlScheme('azerty')
+                }
+              >
+                <strong>AZERTY</strong>
+                <span>Z / S</span>
+              </button>
+            </div>
+          </section>
+
+          <section className="danger-zone">
+            <div>
+              <p className="danger-zone-label">
+                DANGER ZONE
+              </p>
+
+              <h2>Delete account</h2>
+
+              <p>
+                Permanently delete your profile, messages,
+                friendships and game data. This action cannot
+                be undone.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="delete-account-button"
+              disabled={accountDeleting}
+              onClick={() =>
+                void handleDeleteAccount()
+              }
+            >
+              {accountDeleting
+                ? 'Deleting account...'
+                : 'Delete my account'}
+            </button>
+          </section>
+            </>
+          )}
+
+          {page === 'social' && (
+            <>
+              <section className="social-section">
+                <h2>Search users</h2>
 
             <form
               className="search-form"
@@ -930,40 +1441,47 @@ function App() {
             )}
           </section>
 
-          <ConversationList
-            currentUserId={user.id}
-            selectedConversationId={
-              selectedConversation?.id ?? null
-            }
-            refreshKey={conversationRefreshKey}
-            onSelect={setSelectedConversation}
-            onError={setError}
-          />
-
-          {selectedConversation && (
-            <ChatWindow
-              conversation={selectedConversation}
+          <div className="chat-layout">
+            <ConversationList
               currentUserId={user.id}
+              selectedConversationId={
+                selectedConversation?.id ?? null
+              }
+              friends={friends}
               socket={socket}
+              refreshKey={conversationRefreshKey}
+              onSelect={setSelectedConversation}
               onError={setError}
-              onMessageSent={() =>
-                setConversationRefreshKey(
-                  (currentKey) => currentKey + 1,
-                )
+              onUnreadCountChange={
+                setSocialUnreadMessageCount
               }
             />
+
+            <div className="chat-panel">
+              {selectedConversation ? (
+                <ChatWindow
+                  conversation={selectedConversation}
+                  currentUserId={user.id}
+                  socket={socket}
+                  onError={setError}
+                  onMessageSent={() => undefined}
+                />
+              ) : (
+                <div className="empty-chat">
+                  <h2>Select a conversation</h2>
+                  <p>
+                    Choose a conversation to start messaging.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+            </>
           )}
 
           {error && <p className="message error">{error}</p>}
           {success && <p className="message success">{success}</p>}
 
-          <button
-            type="button"
-            className="logout-button"
-            onClick={() => void handleLogout()}
-          >
-            Log out
-          </button>
         </section>
       </main>
     )
@@ -971,8 +1489,15 @@ function App() {
 
   return (
     <main className="page">
-      <section className="card">
-        <h1>Transcendence</h1>
+      <section className="card auth-card">
+        <div className="auth-brand">
+          <span className="brand-mark">T</span>
+
+          <div>
+            <h1>Transcendence</h1>
+            <p>Online Pong Arena</p>
+          </div>
+        </div>
 
         <div className="tabs" aria-label="Authentication mode">
           <button

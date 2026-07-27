@@ -168,6 +168,38 @@ export class UserService {
 		}
 	}
 
+	async deleteAccount(userId: number) {
+		if (
+			!Number.isInteger(userId) ||
+			userId <= 0
+		) {
+			throw new HttpError(
+				400,
+				"Invalid user id",
+			);
+		}
+
+		const deletedAccount =
+			await userRepository.deleteAccount(userId);
+
+		if (!deletedAccount) {
+			throw new HttpError(
+				404,
+				"User not found",
+			);
+		}
+
+		if (deletedAccount.avatarUrl) {
+			const avatarPath = path.resolve(
+				"." + deletedAccount.avatarUrl,
+			);
+
+			await fs.rm(avatarPath, {
+				force: true,
+			});
+		}
+	}
+
 	async searchUsers(
 		userId: number,
 		query: string,
