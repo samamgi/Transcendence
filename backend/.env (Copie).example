@@ -1,3 +1,0 @@
-DATABASE_URL="postgresql://transcendence:transcendence_password@localhost:5432/transcendence"
-SESSION_SECRET="caca"
-PORT=3000
